@@ -1,8 +1,26 @@
-# OpenVideo - AI Video Editor
+<p align="center">
+  <a href="https://github.com/openvideodev/openvideo">
+    <img width="150px" height="150px" src="https://cdn.scenify.io/openvideo-logo.png"/>
+  </a>
+</p>
+<h1 align="center">OpenVideo Editor</h1>
 
+<div align="center">
+  
+  
 An advanced, AI-powered video editor that leverages **WebCodecs API** for high-performance client-side video rendering. This project allows users to create, edit, and export videos directly in the browser with the power of AI.
 
-## Features
+<p align="center">
+    <a href="https://openvideo.dev/">OpenVideo</a>
+    ·  
+    <a href="https://discord.gg/SCfMrQx8kr">Discord</a>
+    ·  
+    <a href="https://docs.openvideo.dev">Docs</a>
+</p>
+</div>
+
+[![](https://cdn.scenify.io/openvideo-editor.png)](https://github.com/openvideodev/openvideo)
+
 
 ### 🤖 AI-Powered Capabilities
 - **AI Copilot**: Chat-based editing assistant to generate scripts, change visuals, and control the timeline.
