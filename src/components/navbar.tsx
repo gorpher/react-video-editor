@@ -1,77 +1,114 @@
-"use client";
-import React from "react";
-import { LogoIcons } from "./shared/logos";
-import { Icons } from "./shared/icons";
-import { Button } from "./ui/button";
-import { useRouter } from "next/navigation";
+import React, { useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { LogoIcons } from "@/components/shared/logos";
+import { Menu, X } from "lucide-react";
+import { authClient } from "@/lib/auth-client";
 
 const Navbar = () => {
-  const router = useRouter();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { data: session } = authClient.useSession();
 
-  const handleGetStarted = (route: string) => {
-    router.push(route);
-  };
-
+  const navLinks = [
+    { name: "Docs", href: "https://docs.openvideo.dev" },
+    { name: "Workflows", href: "/workflows" },
+    { name: "Gallery", href: "/gallery" },
+    { name: "Discord", href: "https://discord.gg/SCfMrQx8kr" },
+    {
+      name: "Github",
+      href: "https://github.com/openvideodev/openvideo-editor",
+    },
+  ];
   return (
-    <nav className="fixed top-2 inset-x-0 z-50 flex justify-center px-4">
-      <div
-        className="flex items-center justify-between w-full max-w-7xl h-16 px-6 
-                     backdrop-blur-md 
-                     border border-border shadow-lg rounded-2xl"
-      >
-        <div
-          className="pointer-events-auto flex h-9 w-9 bg-primary/20 items-center justify-center rounded-md "
-          onClick={() => handleGetStarted("/")}
-        >
-          <LogoIcons.scenify width={24} />
-        </div>
-
-        {/* Links Centrales */}
-        <div className="hidden md:flex items-center gap-8">
-          <a
-            onClick={() => handleGetStarted("/")}
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-          >
-            Home
-          </a>
-          <a
-            onClick={() => handleGetStarted("/workflows")}
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-          >
-            Workflows
-          </a>
-        </div>
-
-        {/* Botones Derecha */}
-        <div className="flex items-center gap-4">
-          <div className="hidden sm:flex items-center gap-3 border-r pr-4 border-border">
-            <a
-              href="https://github.com/openvideodev/openvideo-editor"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-muted-foreground hover:text-foreground transition-colors"
+    <header
+      id="nd-nav"
+      className="border-b w-full bg-background/80 backdrop-blur-md sticky top-0 z-50 px-4"
+      aria-label="Main"
+    >
+      <div className="max-w-7xl mx-auto h-16 flex items-center">
+        {/* Desktop Navigation: 3-column Grid for Symmetry */}
+        <div className="hidden md:grid grid-cols-3 w-full items-center">
+          {/* Left: Logo */}
+          <div className="flex justify-start">
+            <Link
+              className="inline-flex items-center gap-2.5 font-bold tracking-tight"
+              href="/"
             >
-              <Icons.github className="size-4" />
-            </a>
-            <a
-              href="https://discord.gg/SCfMrQx8kr"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              title="Join our Discord"
-            >
-              <Icons.discord className="size-4" />
-            </a>
+              <LogoIcons.scenify className="size-5" />
+              <span>OpenVideo</span>
+            </Link>
           </div>
-          <Button
-            className="px-5 py-2 text-sm font-semibold rounded-full bg-secondary/80 hover:bg-secondary text-secondary-foreground transition-all"
-            onClick={() => handleGetStarted("/projects")}
+
+          {/* Center: Navigation Links */}
+          <div className="flex justify-center">
+            <nav className="flex items-center gap-10 text-sm font-medium">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.name}
+                  href={link.href}
+                  className="text-muted-foreground hover:text-primary transition-colors"
+                >
+                  {link.name}
+                </Link>
+              ))}
+            </nav>
+          </div>
+
+          {/* Right: CTA */}
+          <div className="flex justify-end">
+            <Button asChild size="sm" className="rounded-full">
+              <Link href={session ? "/projects" : "/signin"}>Get started</Link>
+            </Button>
+          </div>
+        </div>
+
+        {/* Mobile Navigation */}
+        <div className="md:hidden flex w-full items-center justify-between">
+          <Link
+            className="inline-flex items-center gap-2.5 font-bold tracking-tight"
+            href="/"
           >
-            Try editor
-          </Button>
+            <LogoIcons.scenify className="text-primary size-5" />
+            <span>OpenVideo</span>
+          </Link>
+
+          <button
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            className="p-2 text-foreground transition-colors focus:outline-none"
+            aria-label="Toggle menu"
+          >
+            {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
         </div>
       </div>
-    </nav>
+
+      {/* Mobile menu overlay */}
+      {isMenuOpen && (
+        <div className="md:hidden border-t py-6 space-y-4 flex flex-col items-center bg-background absolute left-0 right-0 shadow-lg animate-in slide-in-from-top-2 duration-200">
+          {navLinks.map((link) => (
+            <Link
+              key={link.name}
+              href={link.href}
+              className="text-base font-medium text-muted-foreground hover:text-primary transition-colors px-10 py-2 w-full text-center"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              {link.name}
+            </Link>
+          ))}
+          <div className="pt-4 border-t w-full px-10">
+            <Button asChild className="w-full">
+              <Link
+                href={session ? "/projects" : "/signin"}
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Get started
+              </Link>
+            </Button>
+          </div>
+        </div>
+      )}
+    </header>
   );
 };
 
