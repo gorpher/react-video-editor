@@ -21,19 +21,7 @@ import {
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
-
-const ANIMATION_PRESETS = [
-  { label: "Fade In", value: "fadeIn" },
-  { label: "Zoom In", value: "zoomIn" },
-  { label: "Slide In", value: "slideIn" },
-  { label: "Blur In", value: "blurIn" },
-  { label: "Pulse", value: "pulse" },
-  { label: "Pop", value: "popCaption" },
-  { label: "Bounce", value: "bounceCaption" },
-  { label: "Scale", value: "scaleCaption" },
-  { label: "Char Typewriter", value: "charTypewriter" },
-  { label: "Fade By Word", value: "fadeByWord" },
-];
+import { ANIMATION_PRESETS } from "@/constants/animations";
 
 const GalleryPage = () => {
   const effects = getEffectOptions();
@@ -451,7 +439,7 @@ const GalleryPage = () => {
                 </TabsList>
 
                 <TabsContent value="animations">
-                  <ScrollArea className="h-[600px] pr-4">
+                  <ScrollArea className="h-[600px] p-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {ANIMATION_PRESETS.map((preset) => (
                         <PresetCard
@@ -459,6 +447,7 @@ const GalleryPage = () => {
                           label={preset.label}
                           category="Animation"
                           isActive={selectedPreset === preset.value}
+                          image={preset.previewStatic}
                           onClick={() =>
                             handlePresetSelect(preset, "Animation")
                           }
@@ -469,7 +458,7 @@ const GalleryPage = () => {
                 </TabsContent>
 
                 <TabsContent value="effects">
-                  <ScrollArea className="h-[600px] pr-4">
+                  <ScrollArea className="h-[600px] p-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {effects.map((effect) => (
                         <PresetCard
@@ -486,7 +475,7 @@ const GalleryPage = () => {
                 </TabsContent>
 
                 <TabsContent value="transitions">
-                  <ScrollArea className="h-[600px] pr-4">
+                  <ScrollArea className="h-[600px] p-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {transitions.map((transition) => (
                         <PresetCard
@@ -505,7 +494,7 @@ const GalleryPage = () => {
                 </TabsContent>
 
                 <TabsContent value="captions">
-                  <ScrollArea className="h-[600px] pr-4">
+                  <ScrollArea className="h-[600px] p-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {STYLE_CAPTION_PRESETS.map((preset, index) => (
                         <PresetCard
