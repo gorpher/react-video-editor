@@ -4,201 +4,186 @@ import { useState, useEffect, useCallback } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useStudioStore } from "@/stores/studio-store";
 import { useProjectStore } from "@/stores/project-store";
-import { Video, Log, Placeholder } from "openvideo";
-import { Search, Film, Loader2 } from "lucide-react";
+import { Video, Log } from "openvideo";
+import { Search, Film, Upload, Trash2, Music } from "lucide-react";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
-import { cloneDeep, debounce } from "lodash";
+import { Button } from "@/components/ui/button";
+import { storageService } from "@/lib/storage/storage-service";
+import type { MediaFile } from "@/types/media";
+import { uploadFile } from "@/lib/upload-utils";
 
-interface PexelsVideo {
-  id: number;
-  width: number;
-  height: number;
-  url: string;
-  image: string;
-  duration: number;
-  user: {
-    id: number;
-    name: string;
-    url: string;
-  };
-  video_files: {
-    id: number;
-    quality: "hd" | "sd";
-    file_type: string;
-    width: number;
-    height: number;
-    link: string;
-  }[];
+const STORAGE_KEY = "designcombo_uploads";
+const PROJECT_ID = "local-uploads";
+
+interface VisualAsset {
+  id: string;
+  src: string;
+  name: string;
+  duration?: number;
+  size?: number;
+}
+
+function formatDuration(seconds?: number) {
+  if (!seconds) return "";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
 export default function PanelVideos() {
   const { studio } = useStudioStore();
   const { canvasSize } = useProjectStore();
   const [searchQuery, setSearchQuery] = useState("");
-  const [videos, setVideos] = useState<PexelsVideo[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const fetchVideos = async (query: string) => {
-    setIsLoading(true);
-    try {
-      const url = query
-        ? `/api/pexels?type=video&query=${encodeURIComponent(query)}`
-        : `/api/pexels?type=video`;
-      const response = await fetch(url);
-      const data = await response.json();
-      if (data.videos) {
-        setVideos(data.videos);
-      } else {
-        setVideos([]);
-      }
-    } catch (error) {
-      console.error("Failed to fetch videos:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const debouncedFetch = useCallback(
-    debounce((query: string) => fetchVideos(query), 500),
-    [],
-  );
-
-  useEffect(() => {
-    fetchVideos("");
+  const [videos, setVideos] = useState<VisualAsset[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  let fileInputEl: HTMLInputElement | null = null;
+  const fileInputRef = useCallback((node: HTMLInputElement | null) => {
+    if (node) fileInputEl = node;
   }, []);
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const query = e.target.value;
-    setSearchQuery(query);
-    debouncedFetch(query);
-  };
+  const loadVideos = useCallback(() => {
+    const stored: any[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    setVideos(stored.filter((a) => a.type === "video"));
+  }, []);
 
-  const addItemToCanvas = async (asset: PexelsVideo) => {
-    if (!studio) return;
+  useEffect(() => {
+    loadVideos();
+  }, [loadVideos]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
     try {
-      // Find the best quality mp4 link
-      const videoFile = asset.video_files.find((f) => f.quality === "hd") || asset.video_files[0];
-      if (!videoFile) throw new Error("No video file found");
-
-      const src = videoFile.link;
-      const clipName = `Video by ${asset.user.name}`;
-
-      // 1. Create and add placeholder immediately
-      const placeholder = new Placeholder(
-        src,
-        {
-          width: asset.width,
-          height: asset.height,
-          duration: asset.duration * 1e6, // seconds to microseconds
-        },
-        "Video",
-      );
-      placeholder.name = clipName;
-
-      // Scale to fit and center in scene
-      await placeholder.scaleToFit(canvasSize.width, canvasSize.height);
-      placeholder.centerInScene(canvasSize.width, canvasSize.height);
-
-      await studio.addClip(placeholder);
-
-      // 2. Load the real clip in the background
-      Video.fromUrl(src)
-        .then(async (videoClip) => {
-          videoClip.name = clipName;
-
-          // 3. Replace all placeholders with this source once loaded
-          await studio.timeline.replaceClipsBySource(src, async (oldClip) => {
-            const clone = await videoClip.clone();
-            // Copy state from placeholder (user might have moved/resized/split it)
-            clone.id = oldClip.id; // Keep the same ID if possible, or replaceClipsBySource handles it
-            clone.name = oldClip.name; // Keep the name from placeholder
-            clone.left = oldClip.left;
-            clone.top = oldClip.top;
-            clone.width = oldClip.width;
-            clone.height = oldClip.height;
-            const realDuration = videoClip.meta.duration;
-            const newTrim = { ...oldClip.trim };
-            newTrim.to = Math.max(newTrim.to, realDuration);
-            newTrim.from = Math.min(newTrim.from, newTrim.to);
-            console.warn(
-              "This needs to be reviewed. assets from pexels may not have the right duration",
-            );
-            clone.display = { ...oldClip.display };
-            clone.trim = newTrim;
-            clone.duration = (newTrim.to - newTrim.from) / clone.playbackRate;
-            clone.display.to = clone.display.from + clone.duration;
-            clone.zIndex = oldClip.zIndex;
-            return clone;
+      const stored: any[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      for (const file of Array.from(files)) {
+        if (!file.type.startsWith("video/")) continue;
+        const id = crypto.randomUUID();
+        let uploadResult;
+        try {
+          uploadResult = await uploadFile(file);
+        } catch {}
+        const src = uploadResult?.url || URL.createObjectURL(file);
+        if (storageService.isOPFSSupported()) {
+          await storageService.saveMediaFile({
+            projectId: PROJECT_ID,
+            mediaItem: { id, file, name: file.name, type: "video", url: src } as MediaFile,
           });
-        })
-        .catch((err) => {
-          Log.error("Failed to load video in background:", err);
-          // Optional: handle failure by removing placeholder or showing error
+        }
+        stored.unshift({
+          id,
+          name: file.name,
+          src,
+          type: "video",
+          size: file.size,
+          source: "local",
         });
-    } catch (error) {
-      Log.error(`Failed to add video:`, error);
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+      loadVideos();
+    } finally {
+      setIsUploading(false);
+      if (e.target) e.target.value = "";
     }
   };
+
+  const handleDelete = async (id: string) => {
+    if (storageService.isOPFSSupported()) {
+      await storageService.deleteMediaFile({ projectId: PROJECT_ID, id });
+    }
+    const stored: any[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stored.filter((a) => a.id !== id)));
+    loadVideos();
+  };
+
+  const addItemToCanvas = async (asset: VisualAsset) => {
+    if (!studio) return;
+    try {
+      const videoClip = await Video.fromUrl(asset.src);
+      videoClip.name = asset.name;
+      await videoClip.scaleToFit(canvasSize.width, canvasSize.height);
+      videoClip.centerInScene(canvasSize.width, canvasSize.height);
+      await studio.addClip(videoClip);
+    } catch (error) {
+      Log.error("Failed to add video:", error);
+    }
+  };
+
+  const filtered = videos.filter((a) => a.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
     <div className="h-full flex flex-col">
-      <div>
-        <div className="flex-1 p-4">
-          <InputGroup>
-            <InputGroupAddon className="bg-secondary/30 pointer-events-none text-muted-foreground w-8 justify-center">
-              <Search size={14} />
-            </InputGroupAddon>
-
-            <InputGroupInput
-              placeholder="Search stock videos..."
-              className="bg-secondary/30 border-0 h-full text-xs box-border pl-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-              value={searchQuery}
-              onChange={handleSearchChange}
-            />
-          </InputGroup>
-        </div>
+      <input
+        type="file"
+        accept="video/*"
+        multiple
+        className="hidden"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+      />
+      <div className="flex-none p-4 flex gap-2">
+        <InputGroup>
+          <InputGroupAddon className="bg-secondary/30 pointer-events-none text-muted-foreground w-8 justify-center">
+            <Search size={14} />
+          </InputGroupAddon>
+          <InputGroupInput
+            placeholder="搜索视频..."
+            className="bg-secondary/30 border-0 h-full text-xs box-border pl-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </InputGroup>
+        <Button variant="outline" disabled={isUploading} onClick={() => fileInputEl?.click()}>
+          <Upload size={14} />
+        </Button>
       </div>
 
       <ScrollArea className="flex-1 px-4">
-        {isLoading && videos.length === 0 ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="animate-spin text-muted-foreground" size={32} />
-          </div>
-        ) : videos.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2">
             <Film size={32} className="opacity-50" />
-            <span className="text-sm">No videos found</span>
+            <span className="text-sm">{videos.length === 0 ? "暂无视频" : "未找到匹配视频"}</span>
           </div>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
-            {videos.map((video) => (
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-x-3 gap-y-4">
+            {filtered.map((asset) => (
               <div
-                key={video.id}
-                className="group relative aspect-square rounded-md overflow-hidden bg-secondary/50 cursor-pointer border border-transparent hover:border-primary/50 transition-all"
-                onClick={() => addItemToCanvas(video)}
+                key={asset.id}
+                className="flex flex-col gap-1.5 group cursor-pointer"
+                onClick={() => addItemToCanvas(asset)}
               >
-                <div className="w-full h-full flex items-center justify-center bg-black/20 text-[0px]">
-                  <img
-                    src={video.image}
-                    className="w-full h-full object-cover pointer-events-none"
-                    alt={video.user.name}
+                <div className="relative aspect-square rounded-sm overflow-hidden bg-foreground/20 border border-transparent group-hover:border-primary/50 transition-all flex items-center justify-center bg-black/40">
+                  <video
+                    src={asset.src}
+                    className="max-w-full max-h-full object-contain pointer-events-none"
+                    muted
+                    onMouseOver={(e) => (e.currentTarget as HTMLVideoElement).play()}
+                    onMouseOut={(e) => {
+                      (e.currentTarget as HTMLVideoElement).pause();
+                      (e.currentTarget as HTMLVideoElement).currentTime = 0;
+                    }}
                   />
-
-                  <span className="absolute bottom-1 right-1 text-[8px] bg-black/60 text-white px-1 rounded">
-                    {Math.floor(video.duration)}s
-                  </span>
+                  {asset.duration && (
+                    <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/60 text-[10px] text-white font-medium">
+                      {formatDuration(asset.duration)}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="absolute top-1 right-1 p-1 rounded bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(asset.id);
+                    }}
+                  >
+                    <Trash2 size={12} className="text-white" />
+                  </button>
                 </div>
-
-                <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <p className="text-[10px] text-white truncate font-medium">{video.user.name}</p>
-                </div>
+                <p className="text-[10px] text-muted-foreground group-hover:text-foreground truncate transition-colors px-0.5">
+                  {asset.name}
+                </p>
               </div>
             ))}
-          </div>
-        )}
-        {isLoading && videos.length > 0 && (
-          <div className="flex items-center justify-center py-4">
-            <Loader2 className="animate-spin text-muted-foreground" size={20} />
           </div>
         )}
       </ScrollArea>

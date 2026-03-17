@@ -20,3 +20,9 @@ No Voiceover Assets
 Start building your collection by clicking the generate button in the chat panel.
 
 No sound effects found
+
+No images found → 未找到图片
+No videos found → 未找到视频
+No Voiceover Assets → 未找到配音资源
+Start building your collection by clicking the generate button in the chat panel. → 点击聊天面板中的生成按钮，开始创建你的素材库。
+No sound effects found → 未找到音效

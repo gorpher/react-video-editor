@@ -1,7 +1,6 @@
 import {
   IconFolder,
   IconLetterT,
-  IconCircleSquare,
   IconSubtitles,
   IconMusic,
   IconMicrophone,
@@ -22,7 +21,6 @@ export type Tab =
   | "text"
   | "captions"
   | "effects"
-  | "elements"
   | "voiceovers"
   | "sfx"
   | "transitions";
@@ -45,10 +43,6 @@ export const tabs: {
   text: {
     icon: IconLetterT,
     label: "文字",
-  },
-  elements: {
-    icon: IconCircleSquare,
-    label: "元素",
   },
   captions: {
     icon: IconSubtitles,

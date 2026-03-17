@@ -5,147 +5,169 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useStudioStore } from "@/stores/studio-store";
 import { useProjectStore } from "@/stores/project-store";
 import { Image, Log } from "openvideo";
-import { Search, Image as ImageIcon, Loader2 } from "lucide-react";
+import { Search, Image as ImageIcon, Upload, Trash2 } from "lucide-react";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
-import { VisualsChatPanel } from "../visuals-chat-panel";
-import { debounce } from "lodash";
+import { Button } from "@/components/ui/button";
+import { storageService } from "@/lib/storage/storage-service";
+import type { MediaFile } from "@/types/media";
+import { uploadFile } from "@/lib/upload-utils";
 
-interface PexelsImage {
-  id: number;
-  width: number;
-  height: number;
-  url: string;
-  photographer: string;
-  src: {
-    original: string;
-    large2x: string;
-    large: string;
-    medium: string;
-    small: string;
-    portrait: string;
-    landscape: string;
-    tiny: string;
-  };
-  alt: string;
+const STORAGE_KEY = "designcombo_uploads";
+const PROJECT_ID = "local-uploads";
+
+interface VisualAsset {
+  id: string;
+  src: string;
+  name: string;
+  size?: number;
 }
 
 export default function PanelImages() {
   const { studio } = useStudioStore();
   const { canvasSize } = useProjectStore();
   const [searchQuery, setSearchQuery] = useState("");
-  const [images, setImages] = useState<PexelsImage[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [images, setImages] = useState<VisualAsset[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useCallback((node: HTMLInputElement | null) => {
+    if (node) fileInputEl = node;
+  }, []);
+  let fileInputEl: HTMLInputElement | null = null;
 
-  const fetchImages = async (query: string) => {
-    setIsLoading(true);
-    try {
-      const url = query
-        ? `/api/pexels?type=image&query=${encodeURIComponent(query)}`
-        : `/api/pexels?type=image`;
-      const response = await fetch(url);
-      const data = await response.json();
-      if (data.photos) {
-        setImages(data.photos);
-      } else {
-        setImages([]);
-      }
-    } catch (error) {
-      console.error("Failed to fetch images:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Memoize the debounced fetch function
-  const debouncedFetch = useCallback(
-    debounce((query: string) => fetchImages(query), 500),
-    [],
-  );
-
-  useEffect(() => {
-    fetchImages("");
+  const loadImages = useCallback(() => {
+    const stored: any[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    setImages(stored.filter((a) => a.type === "image"));
   }, []);
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const query = e.target.value;
-    setSearchQuery(query);
-    debouncedFetch(query);
-  };
+  useEffect(() => {
+    loadImages();
+  }, [loadImages]);
 
-  const addItemToCanvas = async (asset: PexelsImage) => {
-    if (!studio) return;
-
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
     try {
-      const imageClip = await Image.fromUrl(asset.src.large2x);
-      imageClip.name = `Photo by ${asset.photographer}`;
-      imageClip.display = { from: 0, to: 5 * 1e6 };
-      imageClip.duration = 5 * 1e6;
-
-      // Scale to fit and center in scene
-      await imageClip.scaleToFit(canvasSize.width, canvasSize.height);
-      imageClip.centerInScene(canvasSize.width, canvasSize.height);
-
-      await studio.addClip(imageClip);
-    } catch (error) {
-      Log.error(`Failed to add image:`, error);
+      const stored: any[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      for (const file of Array.from(files)) {
+        if (!file.type.startsWith("image/")) continue;
+        const id = crypto.randomUUID();
+        let uploadResult;
+        try {
+          uploadResult = await uploadFile(file);
+        } catch {}
+        const src = uploadResult?.url || URL.createObjectURL(file);
+        if (storageService.isOPFSSupported()) {
+          await storageService.saveMediaFile({
+            projectId: PROJECT_ID,
+            mediaItem: { id, file, name: file.name, type: "image", url: src } as MediaFile,
+          });
+        }
+        stored.unshift({
+          id,
+          name: file.name,
+          src,
+          type: "image",
+          size: file.size,
+          source: "local",
+        });
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+      loadImages();
+    } finally {
+      setIsUploading(false);
+      if (e.target) e.target.value = "";
     }
   };
+
+  const handleDelete = async (id: string) => {
+    if (storageService.isOPFSSupported()) {
+      await storageService.deleteMediaFile({ projectId: PROJECT_ID, id });
+    }
+    const stored: any[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stored.filter((a) => a.id !== id)));
+    loadImages();
+  };
+
+  const addItemToCanvas = async (asset: VisualAsset) => {
+    if (!studio) return;
+    try {
+      const imageClip = await Image.fromUrl(asset.src);
+      imageClip.name = asset.name;
+      imageClip.display = { from: 0, to: 5 * 1e6 };
+      imageClip.duration = 5 * 1e6;
+      await imageClip.scaleToFit(canvasSize.width, canvasSize.height);
+      imageClip.centerInScene(canvasSize.width, canvasSize.height);
+      await studio.addClip(imageClip);
+    } catch (error) {
+      Log.error("Failed to add image:", error);
+    }
+  };
+
+  const filtered = images.filter((a) => a.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
     <div className="h-full flex flex-col">
-      <div>
-        <div className="flex-1 p-4">
-          <InputGroup>
-            <InputGroupAddon className="bg-secondary/30 pointer-events-none text-muted-foreground w-8 justify-center">
-              <Search size={14} />
-            </InputGroupAddon>
-
-            <InputGroupInput
-              placeholder="Search stock images..."
-              className="bg-secondary/30 border-0 h-full text-xs box-border pl-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-              value={searchQuery}
-              onChange={handleSearchChange}
-            />
-          </InputGroup>
-        </div>
+      <input
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+      />
+      <div className="flex-none p-4 flex gap-2">
+        <InputGroup>
+          <InputGroupAddon className="bg-secondary/30 pointer-events-none text-muted-foreground w-8 justify-center">
+            <Search size={14} />
+          </InputGroupAddon>
+          <InputGroupInput
+            placeholder="搜索图片..."
+            className="bg-secondary/30 border-0 h-full text-xs box-border pl-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </InputGroup>
+        <Button variant="outline" disabled={isUploading} onClick={() => fileInputEl?.click()}>
+          <Upload size={14} />
+        </Button>
       </div>
 
       <ScrollArea className="flex-1 px-4">
-        {isLoading && images.length === 0 ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="animate-spin text-muted-foreground" size={32} />
-          </div>
-        ) : images.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2">
             <ImageIcon size={32} className="opacity-50" />
-            <span className="text-sm">No images found</span>
+            <span className="text-sm">{images.length === 0 ? "暂无图片" : "未找到匹配图片"}</span>
           </div>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
-            {images.map((image) => (
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-x-3 gap-y-4">
+            {filtered.map((asset) => (
               <div
-                key={image.id}
-                className="group relative aspect-square rounded-md overflow-hidden bg-secondary/50 cursor-pointer border border-transparent hover:border-primary/50 transition-all"
-                onClick={() => addItemToCanvas(image)}
+                key={asset.id}
+                className="flex flex-col gap-1.5 group cursor-pointer"
+                onClick={() => addItemToCanvas(asset)}
               >
-                <img
-                  src={image.src.medium}
-                  alt={image.alt}
-                  className="w-full h-full object-cover"
-                />
-
-                <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <p className="text-[10px] text-white truncate font-medium">
-                    {image.photographer}
-                  </p>
+                <div className="relative aspect-square rounded-sm overflow-hidden bg-foreground/20 border border-transparent group-hover:border-primary/50 transition-all">
+                  <img
+                    src={asset.src}
+                    alt={asset.name}
+                    className="max-w-full max-h-full object-contain w-full h-full"
+                  />
+                  <button
+                    type="button"
+                    className="absolute top-1 right-1 p-1 rounded bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(asset.id);
+                    }}
+                  >
+                    <Trash2 size={12} className="text-white" />
+                  </button>
                 </div>
+                <p className="text-[10px] text-muted-foreground group-hover:text-foreground truncate transition-colors px-0.5">
+                  {asset.name}
+                </p>
               </div>
             ))}
-          </div>
-        )}
-        {isLoading && images.length > 0 && (
-          <div className="flex items-center justify-center py-4">
-            <Loader2 className="animate-spin text-muted-foreground" size={20} />
           </div>
         )}
       </ScrollArea>
