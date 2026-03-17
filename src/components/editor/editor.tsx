@@ -12,6 +12,24 @@ import { Compositor } from "openvideo";
 import { WebCodecsUnsupportedModal } from "@/components/editor/webcodecs-unsupported-modal";
 import Assistant from "./assistant/assistant";
 
+type WebCodecsSupportState = {
+  checked: boolean;
+  supported: boolean;
+  reason?: "insecure_context" | "missing_apis";
+  missingApis: string[];
+  origin?: string;
+};
+
+const REQUIRED_WEBCODECS_APIS = [
+  "OffscreenCanvas",
+  "VideoEncoder",
+  "VideoDecoder",
+  "VideoFrame",
+  "AudioEncoder",
+  "AudioDecoder",
+  "AudioData",
+] as const;
+
 export default function Editor() {
   const {
     toolsPanel,
@@ -26,15 +44,90 @@ export default function Editor() {
   } = usePanelStore();
 
   const [isReady, setIsReady] = useState(false);
-  const [isWebCodecsSupported, setIsWebCodecsSupported] = useState(true);
+  const [webCodecsSupport, setWebCodecsSupport] = useState<WebCodecsSupportState>({
+    checked: false,
+    supported: true,
+    missingApis: [],
+  });
 
   useEffect(() => {
     const checkSupport = async () => {
-      const isSupported = await Compositor.isSupported();
-      setIsWebCodecsSupported(isSupported);
+      const isLocalhost = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+      const secureContext = window.isSecureContext || isLocalhost;
+      const missingApis = REQUIRED_WEBCODECS_APIS.filter((api) => !(api in window));
+      const origin = window.location.origin;
+
+      if (!secureContext) {
+        setWebCodecsSupport({
+          checked: true,
+          supported: false,
+          reason: "insecure_context",
+          missingApis,
+          origin,
+        });
+        return;
+      }
+
+      if (missingApis.length > 0) {
+        setWebCodecsSupport({
+          checked: true,
+          supported: false,
+          reason: "missing_apis",
+          missingApis,
+          origin,
+        });
+        return;
+      }
+
+      // Keep the strict openvideo check for diagnostics only; do not hard-block editor UI.
+      try {
+        const strictSupported = await Compositor.isSupported();
+        if (!strictSupported) {
+          console.warn(
+            "[editor] Compositor strict check failed, but base WebCodecs APIs are available. Continuing.",
+          );
+        }
+      } catch (error) {
+        console.warn(
+          "[editor] Compositor support check threw. Continuing with base API checks.",
+          error,
+        );
+      }
+
+      setWebCodecsSupport({
+        checked: true,
+        supported: true,
+        missingApis: [],
+        origin,
+      });
     };
     checkSupport();
   }, []);
+
+  if (!webCodecsSupport.checked) {
+    return (
+      <div className="h-screen w-screen bg-background">
+        <Loading />
+      </div>
+    );
+  }
+
+  if (webCodecsSupport.checked && !webCodecsSupport.supported) {
+    return (
+      <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
+        <Header />
+        <div className="flex-1 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
+          WebCodecs is unavailable in the current context.
+        </div>
+        <WebCodecsUnsupportedModal
+          open
+          reason={webCodecsSupport.reason}
+          missingApis={webCodecsSupport.missingApis}
+          origin={webCodecsSupport.origin}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
@@ -114,9 +207,6 @@ export default function Editor() {
           )}
         </ResizablePanelGroup>
       </div>
-
-      {/* WebCodecs Support Check Modal */}
-      <WebCodecsUnsupportedModal open={!isWebCodecsSupported} />
     </div>
   );
 }

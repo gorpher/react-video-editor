@@ -5,6 +5,7 @@ import { OPFSAdapter } from "./opfs-adapter";
 import type { MediaFileData, StorageConfig, TimelineData } from "./types";
 import type { TimelineTrack } from "@/types/timeline";
 import type { SavedSoundsData, SavedSound, SoundEffect } from "@/types/sounds";
+import { authClient } from "@/lib/auth-client";
 
 export interface StorageStats {
   usedBytes: number;
@@ -15,9 +16,16 @@ export interface StorageStats {
   isPersisted: boolean;
 }
 
+type LocalProjectRecord = Omit<TProject, "createdAt" | "updatedAt"> & {
+  createdAt: string;
+  updatedAt: string;
+};
+
 class StorageService {
+  private projectsAdapter: IndexedDBAdapter<LocalProjectRecord>;
   private savedSoundsAdapter: IndexedDBAdapter<SavedSoundsData>;
   private config: StorageConfig;
+  private sessionStateCache: { authenticated: boolean; checkedAt: number } | null = null;
 
   constructor() {
     this.config = {
@@ -33,6 +41,117 @@ class StorageService {
       "saved-sounds",
       this.config.version,
     );
+    this.projectsAdapter = new IndexedDBAdapter<LocalProjectRecord>(
+      this.config.projectsDb,
+      "projects",
+      this.config.version,
+    );
+  }
+
+  private shouldUseLocalFallback(status: number): boolean {
+    // 401/403: unauthenticated; 5xx: backend unavailable.
+    return status === 401 || status === 403 || status >= 500;
+  }
+
+  private cacheSessionState(authenticated: boolean): void {
+    this.sessionStateCache = {
+      authenticated,
+      checkedAt: Date.now(),
+    };
+  }
+
+  private async shouldUseRemoteProjectApi(): Promise<boolean> {
+    const SESSION_CACHE_TTL_MS = 15_000;
+
+    if (
+      this.sessionStateCache &&
+      Date.now() - this.sessionStateCache.checkedAt < SESSION_CACHE_TTL_MS
+    ) {
+      return this.sessionStateCache.authenticated;
+    }
+
+    try {
+      const response: any = await authClient.getSession();
+      const session = response?.data ?? response;
+      const isAuthenticated = Boolean(session?.user?.id || session?.user);
+      this.cacheSessionState(isAuthenticated);
+      return isAuthenticated;
+    } catch {
+      this.cacheSessionState(false);
+      return false;
+    }
+  }
+
+  private mapProject(project: any): TProject {
+    return {
+      id: project.id,
+      name: project.name,
+      thumbnail: project.thumbnail || "",
+      createdAt: new Date(project.createdAt),
+      updatedAt: new Date(project.updatedAt),
+      scenes: [],
+      currentSceneId: project.currentSceneId || "",
+      backgroundColor: project.backgroundColor,
+      backgroundType: project.backgroundType,
+      blurIntensity: project.blurIntensity,
+      bookmarks: project.bookmarks || [],
+      fps: project.fps,
+      canvasSize: project.canvasSize,
+      canvasMode: project.canvasMode,
+      mediaItems: project.mediaItems,
+      data: project.data,
+    } as TProject;
+  }
+
+  private toLocalProjectRecord(project: TProject): LocalProjectRecord {
+    return {
+      ...project,
+      thumbnail: project.thumbnail || "",
+      currentSceneId: project.currentSceneId || "",
+      createdAt: new Date(project.createdAt).toISOString(),
+      updatedAt: new Date(project.updatedAt).toISOString(),
+    };
+  }
+
+  private async saveProjectLocal({ project }: { project: TProject }): Promise<void> {
+    const now = new Date();
+    const normalized: TProject = {
+      ...project,
+      createdAt: project.createdAt ? new Date(project.createdAt) : now,
+      updatedAt: now,
+      thumbnail: project.thumbnail || "",
+      currentSceneId: project.currentSceneId || "",
+    };
+    await this.projectsAdapter.set(normalized.id, this.toLocalProjectRecord(normalized));
+  }
+
+  private async saveProjectDataLocal(projectId: string, data: any): Promise<void> {
+    const existing = await this.projectsAdapter.get(projectId);
+    if (!existing) {
+      throw new Error(`Project ${projectId} not found in local storage`);
+    }
+
+    await this.projectsAdapter.set(projectId, {
+      ...existing,
+      data,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  private async loadProjectLocal({ id }: { id: string }): Promise<TProject | null> {
+    const localProject = await this.projectsAdapter.get(id);
+    if (!localProject) return null;
+    return this.mapProject(localProject);
+  }
+
+  private async loadAllProjectsLocal(): Promise<TProject[]> {
+    const ids = await this.projectsAdapter.list();
+    const projects = await Promise.all(ids.map((id) => this.projectsAdapter.get(id)));
+
+    return projects
+      .filter((project): project is LocalProjectRecord => Boolean(project))
+      .map((project) => this.mapProject(project))
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
   }
 
   // Helper to get project-specific media adapters
@@ -65,9 +184,10 @@ class StorageService {
 
   // Project operations
   async saveProject({ project }: { project: TProject }): Promise<void> {
-    // We try to update first, if it fails or if it's new we might need a different approach
-    // But for simplicity, we'll check if it exists or just use a dedicated "update" vs "create" approach
-    // In this singleton service, we can just call the individual API
+    if (!(await this.shouldUseRemoteProjectApi())) {
+      await this.saveProjectLocal({ project });
+      return;
+    }
 
     try {
       // First check if project exists
@@ -90,16 +210,37 @@ class StorageService {
         }),
       });
 
+      if (res.ok) {
+        await this.saveProjectLocal({ project });
+        return;
+      }
+
+      if (this.shouldUseLocalFallback(res.status)) {
+        if (res.status === 401 || res.status === 403) {
+          this.cacheSessionState(false);
+        }
+        console.warn(
+          `[storage] /api/projects returned ${res.status}, falling back to local project storage`,
+        );
+        await this.saveProjectLocal({ project });
+        return;
+      }
+
       if (!res.ok) {
         throw new Error(`Failed to save project: ${res.statusText}`);
       }
     } catch (e) {
-      console.error("Error saving project to DB:", e);
-      throw e;
+      console.warn("[storage] Failed to save project via API, falling back to local storage", e);
+      await this.saveProjectLocal({ project });
     }
   }
 
   async saveProjectFull(projectId: string, data: any): Promise<void> {
+    if (!(await this.shouldUseRemoteProjectApi())) {
+      await this.saveProjectDataLocal(projectId, data);
+      return;
+    }
+
     try {
       const res = await fetch(`/api/projects/${projectId}`, {
         method: "PATCH",
@@ -107,85 +248,130 @@ class StorageService {
         body: JSON.stringify({ data }),
       });
 
-      if (!res.ok) {
-        throw new Error(`Failed to save project data: ${res.statusText}`);
+      if (res.ok) {
+        await this.saveProjectDataLocal(projectId, data).catch(() => {});
+        return;
       }
+
+      if (this.shouldUseLocalFallback(res.status)) {
+        if (res.status === 401 || res.status === 403) {
+          this.cacheSessionState(false);
+        }
+        console.warn(
+          `[storage] /api/projects/${projectId} returned ${res.status}, saving data locally`,
+        );
+        await this.saveProjectDataLocal(projectId, data);
+        return;
+      }
+
+      throw new Error(`Failed to save project data: ${res.statusText}`);
     } catch (e) {
-      console.error("Error saving project data to DB:", e);
-      throw e;
+      console.warn("[storage] Failed to save full project via API, saving locally", e);
+      await this.saveProjectDataLocal(projectId, data);
     }
   }
 
   async loadProject({ id }: { id: string }): Promise<TProject | null> {
+    if (!(await this.shouldUseRemoteProjectApi())) {
+      return await this.loadProjectLocal({ id });
+    }
+
     try {
       const res = await fetch(`/api/projects/${id}`);
-      if (!res.ok) return null;
+      if (res.ok) {
+        const dbProject = await res.json();
+        const mapped = this.mapProject(dbProject);
+        await this.saveProjectLocal({ project: mapped }).catch(() => {});
+        return mapped;
+      }
 
-      const dbProject = await res.json();
+      if (this.shouldUseLocalFallback(res.status) || res.status === 404) {
+        if (res.status === 401 || res.status === 403) {
+          this.cacheSessionState(false);
+        }
+        return await this.loadProjectLocal({ id });
+      }
 
-      // Mapping from DB model (project) to TProject
-      return {
-        id: dbProject.id,
-        name: dbProject.name,
-        thumbnail: dbProject.thumbnail,
-        createdAt: new Date(dbProject.createdAt),
-        updatedAt: new Date(dbProject.updatedAt),
-        scenes: [], // Scenes are now simplified out or handled differently
-        currentSceneId: dbProject.currentSceneId || "",
-        backgroundColor: dbProject.backgroundColor,
-        backgroundType: dbProject.backgroundType,
-        blurIntensity: dbProject.blurIntensity,
-        bookmarks: dbProject.bookmarks || [],
-        fps: dbProject.fps,
-        canvasSize: dbProject.canvasSize,
-        canvasMode: dbProject.canvasMode,
-        data: dbProject.data,
-      } as TProject;
-    } catch (e) {
-      console.error("Error loading project from DB:", e);
       return null;
+    } catch (e) {
+      console.warn("[storage] Failed to load project from API, trying local storage", e);
+      return await this.loadProjectLocal({ id });
     }
   }
 
   async loadAllProjects(): Promise<TProject[]> {
+    if (!(await this.shouldUseRemoteProjectApi())) {
+      return await this.loadAllProjectsLocal();
+    }
+
     try {
       const res = await fetch("/api/projects");
-      if (!res.ok) return [];
+      if (res.ok) {
+        const dbProjects = await res.json();
+        const remoteProjects: TProject[] = (Array.isArray(dbProjects) ? dbProjects : []).map(
+          (dbProject: any) => this.mapProject(dbProject),
+        );
 
-      const dbProjects = await res.json();
+        await Promise.all(
+          remoteProjects.map((project) => this.saveProjectLocal({ project }).catch(() => {})),
+        );
 
-      return dbProjects.map((dbProject: any) => ({
-        id: dbProject.id,
-        name: dbProject.name,
-        thumbnail: dbProject.thumbnail,
-        createdAt: new Date(dbProject.createdAt),
-        updatedAt: new Date(dbProject.updatedAt),
-        scenes: [],
-        currentSceneId: dbProject.currentSceneId || "",
-        backgroundColor: dbProject.backgroundColor,
-        backgroundType: dbProject.backgroundType,
-        blurIntensity: dbProject.blurIntensity,
-        bookmarks: dbProject.bookmarks || [],
-        fps: dbProject.fps,
-        canvasSize: dbProject.canvasSize,
-        canvasMode: dbProject.canvasMode,
-        data: dbProject.data,
-      }));
-    } catch (e) {
-      console.error("Error loading all projects from DB:", e);
+        const localProjects = await this.loadAllProjectsLocal();
+        const projectMap = new Map<string, TProject>();
+
+        // Prefer remote records when both exist.
+        for (const localProject of localProjects) {
+          projectMap.set(localProject.id, localProject);
+        }
+        for (const remoteProject of remoteProjects) {
+          projectMap.set(remoteProject.id, remoteProject);
+        }
+
+        return Array.from(projectMap.values()).sort(
+          (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+        );
+      }
+
+      if (this.shouldUseLocalFallback(res.status)) {
+        if (res.status === 401 || res.status === 403) {
+          this.cacheSessionState(false);
+        }
+        return await this.loadAllProjectsLocal();
+      }
+
       return [];
+    } catch (e) {
+      console.warn("[storage] Failed to load project list from API, trying local storage", e);
+      return await this.loadAllProjectsLocal();
     }
   }
 
   async deleteProject({ id }: { id: string }): Promise<void> {
+    if (!(await this.shouldUseRemoteProjectApi())) {
+      await this.projectsAdapter.remove(id).catch(() => {});
+      const { mediaFilesAdapter } = this.getProjectMediaAdapters({
+        projectId: id,
+      });
+      await mediaFilesAdapter.clear();
+      const timelineAdapter = this.getProjectTimelineAdapter({ projectId: id });
+      await timelineAdapter.clear();
+      return;
+    }
+
     try {
       const res = await fetch(`/api/projects/${id}`, {
         method: "DELETE",
       });
 
-      if (!res.ok) {
+      if (!res.ok && !this.shouldUseLocalFallback(res.status) && res.status !== 404) {
         throw new Error(`Failed to delete project: ${res.statusText}`);
       }
+
+      if (res.status === 401 || res.status === 403) {
+        this.cacheSessionState(false);
+      }
+
+      await this.projectsAdapter.remove(id).catch(() => {});
 
       // Also delete project-specific local data (media/temp files)
       const { mediaFilesAdapter } = this.getProjectMediaAdapters({
@@ -196,8 +382,18 @@ class StorageService {
       const timelineAdapter = this.getProjectTimelineAdapter({ projectId: id });
       await timelineAdapter.clear();
     } catch (e) {
-      console.error("Failed to delete project or clear local data", e);
-      throw e;
+      console.warn(
+        "[storage] Failed to delete project via API, deleting local data only for this project",
+        e,
+      );
+
+      await this.projectsAdapter.remove(id).catch(() => {});
+      const { mediaFilesAdapter } = this.getProjectMediaAdapters({
+        projectId: id,
+      });
+      await mediaFilesAdapter.clear();
+      const timelineAdapter = this.getProjectTimelineAdapter({ projectId: id });
+      await timelineAdapter.clear();
     }
   }
 

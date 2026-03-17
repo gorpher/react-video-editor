@@ -1,22 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Editor from "@/components/editor/editor";
 import { storageService } from "@/lib/storage/storage-service";
 import { useProjectStore } from "@/stores/project-store";
 import { registerCustomEffect, registerCustomTransition } from "openvideo";
+import { authClient } from "@/lib/auth-client";
 
 export default function EditProjectPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.projectId as string;
   const [isLoaded, setIsLoaded] = useState(false);
+  const loadedProjectRef = useRef<string | null>(null);
 
   useEffect(() => {
-    async function loadProjectData() {
-      if (!projectId) return;
+    if (!projectId) return;
+    if (loadedProjectRef.current === projectId) return;
+    loadedProjectRef.current = projectId;
 
+    async function loadProjectData() {
       try {
         const project = await storageService.loadProject({ id: projectId });
 
@@ -36,32 +40,35 @@ export default function EditProjectPage() {
         // Register the user's custom effects & transitions before loading the
         // project JSON so the studio can resolve any custom shader keys it finds.
         try {
-          const [effectsRes, transitionsRes] = await Promise.all([
-            fetch("/api/custom-presets?category=effects"),
-            fetch("/api/custom-presets?category=transitions"),
-          ]);
+          const sessionRes: any = await authClient.getSession();
+          const session = sessionRes?.data ?? sessionRes;
+          if (session?.user) {
+            const effectsRes = await fetch("/api/custom-presets?category=effects");
 
-          if (effectsRes.ok) {
-            const { own: ownEffects = [], published: pubEffects = [] } = await effectsRes.json();
-            for (const preset of [...ownEffects, ...pubEffects]) {
-              const key = `custom_effect_${preset.id}`;
-              registerCustomEffect(key, {
-                key,
-                label: preset.data?.label || preset.name,
-                fragment: preset.data?.fragment,
-              } as any);
-            }
-          }
+            if (effectsRes.ok) {
+              const { own: ownEffects = [], published: pubEffects = [] } = await effectsRes.json();
+              for (const preset of [...ownEffects, ...pubEffects]) {
+                const key = `custom_effect_${preset.id}`;
+                registerCustomEffect(key, {
+                  key,
+                  label: preset.data?.label || preset.name,
+                  fragment: preset.data?.fragment,
+                } as any);
+              }
 
-          if (transitionsRes.ok) {
-            const { own: ownTrans = [], published: pubTrans = [] } = await transitionsRes.json();
-            for (const preset of [...ownTrans, ...pubTrans]) {
-              const key = `custom_transition_${preset.id}`;
-              registerCustomTransition(key, {
-                key,
-                label: preset.data?.label || preset.name,
-                fragment: preset.data?.fragment,
-              } as any);
+              const transitionsRes = await fetch("/api/custom-presets?category=transitions");
+              if (transitionsRes.ok) {
+                const { own: ownTrans = [], published: pubTrans = [] } =
+                  await transitionsRes.json();
+                for (const preset of [...ownTrans, ...pubTrans]) {
+                  const key = `custom_transition_${preset.id}`;
+                  registerCustomTransition(key, {
+                    key,
+                    label: preset.data?.label || preset.name,
+                    fragment: preset.data?.fragment,
+                  } as any);
+                }
+              }
             }
           }
         } catch (err) {
