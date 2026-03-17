@@ -4,12 +4,10 @@ import { cn } from "@/lib/utils";
 import { IconShare } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { useStudioStore } from "@/stores/studio-store";
-import { usePanelStore } from "@/stores/panel-store";
 import { useProjectStore } from "@/stores/project-store";
 import { DEFAULT_CANVAS_PRESETS } from "@/lib/editor-utils";
 import { Log, type IClip } from "openvideo";
 import { ExportModal } from "./export-modal";
-import { LogoIcons } from "../shared/logos";
 import Link from "next/link";
 import { Icons } from "../shared/icons";
 import {
@@ -42,7 +40,6 @@ import { Save } from "lucide-react";
 
 export default function Header() {
   const { studio } = useStudioStore();
-  const { toggleCopilot, isCopilotVisible } = usePanelStore();
   const { aspectRatio, setCanvasSize } = useProjectStore();
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -330,10 +327,10 @@ export default function Header() {
       {/* Left Section */}
       <div className="flex items-center gap-2">
         <div
-          className="pointer-events-auto flex h-9 w-9 bg-primary/20 items-center justify-center rounded-md "
+          className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-md cursor-pointer overflow-hidden"
           onClick={() => handleGetStarted("/")}
         >
-          <LogoIcons.scenify width={24} />
+          <img src="/logo.png" alt="logo" className="w-9 h-9 object-cover rounded-md" />
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -501,6 +498,7 @@ export default function Header() {
             <Keyboard className="size-5" />
           </Button>
 
+          {/* AI 助手按钮暂时隐藏，后期启用
           <Button
             size={"sm"}
             variant="outline"
@@ -511,6 +509,7 @@ export default function Header() {
             <Icons.ai className="size-5" />
             <span className="hidden md:block">AI 助手</span>
           </Button>
+          */}
         </div>
 
         {/* End of right actions */}

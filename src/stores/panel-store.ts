@@ -28,7 +28,7 @@ export const usePanelStore = create<PanelState>()(
       propertiesPanel: 25,
       mainContent: 70,
       timeline: 30,
-      isCopilotVisible: true,
+      isCopilotVisible: false,
 
       setToolsPanel: (size) => set({ toolsPanel: size }),
       setPreviewPanel: (size) => set({ previewPanel: size }),

@@ -6,6 +6,8 @@
   - `notes/project-notes-2026-03-17.md`
   - `notes/aifilm-media-integration-2026-03-17.md`
 
+原项目：https://github.com/openvideodev/react-video-editor
+
 ## 1. 项目定位
 
 这是一个基于 **Next.js App Router + React 19** 的浏览器端 AI 视频编辑器，项目名为 `openvideo-editor`。
