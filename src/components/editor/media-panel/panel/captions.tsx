@@ -386,7 +386,7 @@ export default function PanelCaptions() {
       <div className="flex flex-1 flex-col gap-4 overflow-hidden min-w-0">
         {mediaItems.length === 0 ? (
           <div className="flex flex-1 items-center justify-center text-center text-sm text-muted-foreground p-8">
-            Add video or audio to the timeline to generate captions.
+            请先在时间轴中添加视频或音频，然后生成字幕。
           </div>
         ) : captionItems.length > 0 ? (
           <div className="flex-1 overflow-hidden">
@@ -409,7 +409,7 @@ export default function PanelCaptions() {
         ) : (
           <div className="flex flex-col gap-6 p-4 py-6 items-center text-center">
             <div className="text-sm text-muted-foreground">
-              Recognize speech in the selected media and generate captions automatically.
+              自动识别所选媒体中的语音并生成字幕。
             </div>
             <Button
               onClick={handleGenerateCaptions}
@@ -420,10 +420,10 @@ export default function PanelCaptions() {
               {isGenerating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating...
+                  生成中...
                 </>
               ) : (
-                "Generate Captions"
+                "生成字幕"
               )}
             </Button>
           </div>

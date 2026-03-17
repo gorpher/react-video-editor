@@ -205,7 +205,7 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
 
       setTimeout(() => {
         handleDownload(blobUrl);
-        toast.success("Rendering complete! Your download has started.");
+        toast.success("渲染完成，下载已开始");
         setTimeout(() => handleClose(), 1500);
       }, 500);
     } catch (error) {
@@ -242,7 +242,7 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
             {/* Header */}
             <div className="px-6 pt-6 pb-4">
               <DialogTitle className="text-sm font-semibold tracking-tight text-foreground">
-                Export
+                导出
               </DialogTitle>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {studioOpts.width}×{studioOpts.height} · {(maxDuration / 1e6).toFixed(1)}s
@@ -255,14 +255,14 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                   <div className="flex items-center gap-2">
                     <Video className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-xs font-medium text-foreground">Video</span>
+                    <span className="text-xs font-medium text-foreground">视频</span>
                   </div>
                   <Switch checked={includeVideo} onCheckedChange={setIncludeVideo} />
                 </div>
                 <div
                   className={`px-4 py-3 flex flex-col gap-3 transition-opacity ${!includeVideo ? "opacity-30 pointer-events-none" : ""}`}
                 >
-                  <Row label="Format">
+                  <Row label="格式">
                     <Select value={format} onValueChange={setFormat}>
                       <SelectTrigger className={selectCls}>
                         <SelectValue />
@@ -276,7 +276,7 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
                       </SelectContent>
                     </Select>
                   </Row>
-                  <Row label="Codec">
+                  <Row label="编码">
                     <Select value={videoCodec} onValueChange={setVideoCodec}>
                       <SelectTrigger className={selectCls}>
                         <SelectValue />
@@ -290,7 +290,7 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
                       </SelectContent>
                     </Select>
                   </Row>
-                  <Row label="Quality">
+                  <Row label="质量">
                     <Select value={quality} onValueChange={setQuality}>
                       <SelectTrigger className={selectCls}>
                         <SelectValue />
@@ -304,7 +304,7 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
                       </SelectContent>
                     </Select>
                   </Row>
-                  <Row label="Frame Rate">
+                  <Row label="帧率">
                     <Select value={fps} onValueChange={setFps}>
                       <SelectTrigger className={selectCls}>
                         <SelectValue />
@@ -326,7 +326,7 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                   <div className="flex items-center gap-2">
                     <Music className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-xs font-medium text-foreground">Audio</span>
+                    <span className="text-xs font-medium text-foreground">音频</span>
                   </div>
                   <Switch checked={includeAudio} onCheckedChange={setIncludeAudio} />
                 </div>
@@ -334,7 +334,7 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
                   className={`px-4 py-3 flex flex-col gap-3 transition-opacity ${!includeAudio ? "opacity-30 pointer-events-none" : ""}`}
                 >
                   {!includeVideo && (
-                    <Row label="Format">
+                    <Row label="格式">
                       <Select value={format} onValueChange={setFormat}>
                         <SelectTrigger className={selectCls}>
                           <SelectValue />
@@ -349,7 +349,7 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
                       </Select>
                     </Row>
                   )}
-                  <Row label="Codec">
+                  <Row label="编码">
                     <Select value={audioCodec} onValueChange={setAudioCodec}>
                       <SelectTrigger className={selectCls}>
                         <SelectValue />
@@ -363,7 +363,7 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
                       </SelectContent>
                     </Select>
                   </Row>
-                  <Row label="Sample Rate">
+                  <Row label="采样率">
                     <Select value={audioSampleRate} onValueChange={setAudioSampleRate}>
                       <SelectTrigger className={selectCls}>
                         <SelectValue />
@@ -392,13 +392,13 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
                     onClick={handleClose}
                     className="h-8 px-4 text-xs rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
                   >
-                    Cancel
+                    取消
                   </Button>
                   <Button
                     onClick={startExport}
                     className="h-8 px-5 text-xs rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
                   >
-                    Export
+                    导出
                   </Button>
                 </div>
               </div>
@@ -408,9 +408,7 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
           /* Progress view */
           <div className="flex flex-col p-6 gap-6">
             <div>
-              <DialogTitle className="text-sm font-semibold text-foreground">
-                Exporting…
-              </DialogTitle>
+              <DialogTitle className="text-sm font-semibold text-foreground">导出中…</DialogTitle>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {format.toUpperCase()} · {studioOpts.width}×{studioOpts.height}
               </p>
@@ -419,17 +417,17 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
             {/* Summary pill grid */}
             <div className="grid grid-cols-3 gap-2">
               {[
-                { label: "Format", value: format.toUpperCase() },
-                { label: "FPS", value: fps },
+                { label: "格式", value: format.toUpperCase() },
+                { label: "帧率", value: fps },
                 {
-                  label: "Resolution",
-                  value: includeVideo ? `${studioOpts.width}×${studioOpts.height}` : "N/A",
+                  label: "分辨率",
+                  value: includeVideo ? `${studioOpts.width}×${studioOpts.height}` : "无",
                 },
-                { label: "Video", value: includeVideo ? "On" : "Off" },
-                { label: "Audio", value: includeAudio ? "On" : "Off" },
+                { label: "视频", value: includeVideo ? "开" : "关" },
+                { label: "音频", value: includeAudio ? "开" : "关" },
                 {
-                  label: "Sample",
-                  value: includeAudio ? `${Number(audioSampleRate) / 1000}k` : "N/A",
+                  label: "采样",
+                  value: includeAudio ? `${Number(audioSampleRate) / 1000}k` : "无",
                 },
               ].map(({ label, value }) => (
                 <div key={label} className="rounded-lg border border-border bg-card px-3 py-2">
@@ -442,7 +440,7 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
             {/* Progress bar */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-muted-foreground">Progress</span>
+                <span className="text-xs text-muted-foreground">进度</span>
                 <span className="text-xs font-mono text-muted-foreground">
                   {Math.round(exportProgress * 100)}%
                   {exportProgress > 0 && exportStartTime
@@ -453,7 +451,7 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
                         const secs = Math.floor(remaining % 60);
                         return ` · ${mins}m ${secs}s left`;
                       })()
-                    : " · preparing…"}
+                    : " · 准备中…"}
                 </span>
               </div>
               <div className="relative h-1 w-full overflow-hidden rounded-full bg-muted">
@@ -470,7 +468,7 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
               className="w-full h-9 text-xs rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted"
             >
               {isExporting && <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />}
-              Cancel Export
+              取消导出
             </Button>
           </div>
         )}

@@ -117,7 +117,7 @@ export default function Editor() {
       <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
         <Header />
         <div className="flex-1 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
-          WebCodecs is unavailable in the current context.
+          当前上下文中 WebCodecs 不可用。
         </div>
         <WebCodecsUnsupportedModal
           open

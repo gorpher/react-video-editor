@@ -131,7 +131,7 @@ export default function PanelText() {
     <div className="flex flex-col h-full overflow-hidden">
       <div className="p-4">
         <Button onClick={() => handleAddText()} className="w-full h-9">
-          Add Text
+          添加文字
         </Button>
       </div>
       <div className="flex-1 overflow-y-auto px-4">

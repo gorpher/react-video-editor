@@ -60,7 +60,7 @@ export default function Header() {
     if (!isNaN(w) && !isNaN(h) && w > 0 && h > 0) {
       setCanvasSize({ width: w, height: h }, "Custom");
     } else {
-      toast.error("Invalid dimensions");
+      toast.error("尺寸无效");
     }
   };
 
@@ -188,19 +188,19 @@ export default function Header() {
     setIsSaving(true);
     let toastId;
     if (showToast) {
-      toastId = toast.loading("Saving project...");
+      toastId = toast.loading("保存中...");
     }
 
     try {
       const studioJSON = studio.exportToJSON();
       await storageService.saveProjectFull(projectId, studioJSON);
       if (showToast) {
-        toast.success("Project saved", { id: toastId });
+        toast.success("已保存", { id: toastId });
       }
     } catch (error) {
       console.error("Failed to save project", error);
       if (showToast) {
-        toast.error("Failed to save project", { id: toastId });
+        toast.error("保存失败", { id: toastId });
       }
     } finally {
       setIsSaving(false);
@@ -229,9 +229,7 @@ export default function Header() {
 
   const handleNew = () => {
     if (!studio) return;
-    const confirmed = window.confirm(
-      "Are you sure you want to start a new project? Unsaved changes will be lost.",
-    );
+    const confirmed = window.confirm("确定要新建项目吗？未保存的内容将丢失。");
     if (confirmed) {
       studio.clear();
     }
@@ -244,7 +242,7 @@ export default function Header() {
       // Get all clips from studio
       const clips = (studio as any).clips as IClip[];
       if (clips.length === 0) {
-        alert("No clips to export");
+        alert("没有可导出的片段");
         return;
       }
 
@@ -339,20 +337,20 @@ export default function Header() {
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost">File</Button>
+            <Button variant="ghost">文件</Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-48">
             <DropdownMenuItem onClick={handleExportJSON}>
               <Download className="mr-2 h-4 w-4" />
-              <span>Export (to JSON)</span>
+              <span>导出 JSON</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleImportJSON}>
               <Upload className="mr-2 h-4 w-4" />
-              <span>Import from JSON</span>
+              <span>从 JSON 导入</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleNew}>
               <FilePlus className="mr-2 h-4 w-4" />
-              <span>Clear or New project</span>
+              <span>清空 / 新建</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -360,31 +358,31 @@ export default function Header() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-8 ">
-              Resize
+              画布尺寸
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56 p-3">
             <div className="space-y-4">
               <div className="space-y-2">
                 <p className="text-xs font-medium text-muted-foreground px-1 uppercase tracking-wider">
-                  Presets
+                  预设
                 </p>
                 <div className="grid grid-cols-1 gap-1">
                   {[
                     {
-                      label: "Square",
+                      label: "正方形",
                       icon: Square,
                       width: 1080,
                       height: 1080,
                     },
                     {
-                      label: "Portrait",
+                      label: "竖屏",
                       icon: Smartphone,
                       width: 1080,
                       height: 1920,
                     },
                     {
-                      label: "Landscape",
+                      label: "横屏",
                       icon: Monitor,
                       width: 1920,
                       height: 1080,
@@ -425,11 +423,11 @@ export default function Header() {
 
               <div className="space-y-3">
                 <p className="text-xs font-medium text-muted-foreground px-1 uppercase tracking-wider">
-                  Custom
+                  自定义
                 </p>
                 <div className="grid grid-cols-2 gap-2 px-1">
                   <div className="space-y-1">
-                    <label className="text-[10px] text-muted-foreground uppercase">Width</label>
+                    <label className="text-[10px] text-muted-foreground uppercase">宽</label>
                     <input
                       type="number"
                       value={customWidth}
@@ -439,7 +437,7 @@ export default function Header() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] text-muted-foreground uppercase">Height</label>
+                    <label className="text-[10px] text-muted-foreground uppercase">高</label>
                     <input
                       type="number"
                       value={customHeight}
@@ -454,7 +452,7 @@ export default function Header() {
                   className="w-full h-8 text-xs font-medium mt-1"
                   size="sm"
                 >
-                  Apply
+                  应用
                 </Button>
               </div>
             </div>
@@ -488,7 +486,7 @@ export default function Header() {
 
       {/* Center Section */}
       <div className="absolute text-sm font-medium left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-        Untitled video
+        未命名视频
       </div>
 
       {/* Right Section */}
@@ -508,18 +506,12 @@ export default function Header() {
             variant="outline"
             onClick={toggleCopilot}
             className="h-7"
-            title="Toggle Chat Copilot"
+            title="切换 AI 助手"
           >
             <Icons.ai className="size-5" />
-            <span className="hidden md:block">AI Chat</span>
+            <span className="hidden md:block">AI 助手</span>
           </Button>
         </div>
-        <Link href="https://discord.gg/SCfMrQx8kr" target="_blank">
-          <Button className="h-7 rounded-lg" variant={"outline"}>
-            <LogoIcons.discord className="w-6 h-6" />
-            <span className="hidden md:block">Join Us</span>
-          </Button>
-        </Link>
 
         {/* End of right actions */}
 
@@ -529,7 +521,7 @@ export default function Header() {
         <ModeToggle />
 
         <Button size="sm" className="gap-2 rounded-full" onClick={() => setIsExportModalOpen(true)}>
-          Download
+          导出
         </Button>
       </div>
     </header>

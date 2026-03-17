@@ -93,7 +93,7 @@ function ProjectCard({ project, onOpen, onDelete }: ProjectCardProps) {
                   className="w-full flex items-center gap-2 px-3 py-2.5 text-destructive hover:bg-destructive/10 active:bg-destructive/20 transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  Delete
+                  删除
                 </button>
               </div>
             )}
@@ -140,7 +140,7 @@ export default function ProjectsPage() {
     const sceneId = generateUUID();
     const newProject: TProject = {
       id: generateUUID(),
-      name: "Untitled project",
+      name: "未命名项目",
       thumbnail: "",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -190,10 +190,10 @@ export default function ProjectsPage() {
               className="flex items-center gap-1 text-muted-foreground hover:text-foreground active:text-foreground transition-colors shrink-0"
             >
               <Home className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Home</span>
+              <span className="hidden sm:inline">主页</span>
             </button>
             <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
-            <span className="font-medium truncate">Projects</span>
+            <span className="font-medium truncate">项目</span>
           </nav>
 
           {/* Actions */}
@@ -204,7 +204,7 @@ export default function ProjectsPage() {
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search projects…"
+                placeholder="搜索项目…"
                 className="h-8 pl-7 pr-7 text-xs w-44 bg-muted/30 border-border/30 rounded-lg placeholder:text-muted-foreground/40 focus-visible:ring-0 focus-visible:border-border/60"
               />
               {searchQuery && (
@@ -229,7 +229,7 @@ export default function ProjectsPage() {
             {/* New project — icon-only on mobile, full on sm+ */}
             <Button onClick={handleCreateProject} size="sm" className="h-8 rounded-full gap-1.5">
               <Plus className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline text-xs">New project</span>
+              <span className="hidden sm:inline text-xs">新建项目</span>
             </Button>
           </div>
         </div>
@@ -243,7 +243,7 @@ export default function ProjectsPage() {
                 ref={searchInputRef}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search projects…"
+                placeholder="搜索项目…"
                 className="h-9 pl-7 pr-7 text-sm bg-muted/30 border-border/30 rounded-lg placeholder:text-muted-foreground/40 focus-visible:ring-0 focus-visible:border-border/60"
               />
               {searchQuery && (
@@ -262,7 +262,7 @@ export default function ProjectsPage() {
               }}
               className="text-sm text-muted-foreground hover:text-foreground shrink-0"
             >
-              Cancel
+              取消
             </button>
           </div>
         )}
@@ -289,20 +289,20 @@ export default function ProjectsPage() {
             {searchQuery ? (
               <>
                 <h3 className="font-medium text-foreground">
-                  No results for &ldquo;{searchQuery}&rdquo;
+                  未找到 &ldquo;{searchQuery}&rdquo; 的相关结果
                 </h3>
-                <p className="text-sm">Try a different search term.</p>
+                <p className="text-sm">请尝试其他关键词</p>
               </>
             ) : (
               <>
-                <h3 className="font-medium text-foreground">No projects yet</h3>
-                <p className="text-sm mb-4">Create your first project to get started.</p>
+                <h3 className="font-medium text-foreground">暂无项目</h3>
+                <p className="text-sm mb-4">创建第一个项目开始使用</p>
                 <Button
                   onClick={handleCreateProject}
                   variant="outline"
                   className="mt-1 px-5 rounded-full gap-1.5"
                 >
-                  <PlusIcon className="w-4 h-4" /> Create project
+                  <PlusIcon className="w-4 h-4" /> 创建项目
                 </Button>
               </>
             )}

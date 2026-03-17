@@ -1,0 +1,20 @@
+如果量太大，可以一个页面一个页面的分批次汉化；
+不追求一次全汉化完，风险更低；
+主要是界面UI上肉眼可见的文字需要汉化。
+
+==============================
+
+
+
+===============================
+
+Initialize
+
+Loading project
+
+No images found
+No videos found
+No Voiceover Assets
+Start building your collection by clicking the generate button in the chat panel.
+
+No sound effects found

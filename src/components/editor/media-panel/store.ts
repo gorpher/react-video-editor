@@ -32,47 +32,47 @@ export const tabs: {
 } = {
   uploads: {
     icon: IconFolder,
-    label: "Uploads",
+    label: "素材",
   },
   images: {
     icon: IconPhoto,
-    label: "Images",
+    label: "图片",
   },
   videos: {
     icon: IconVideo,
-    label: "Videos",
+    label: "视频",
   },
   text: {
     icon: IconLetterT,
-    label: "Text",
+    label: "文字",
   },
   elements: {
     icon: IconCircleSquare,
-    label: "Elements",
+    label: "元素",
   },
   captions: {
     icon: IconSubtitles,
-    label: "Captions",
+    label: "字幕",
   },
   music: {
     icon: IconMusic,
-    label: "Music",
+    label: "音乐",
   },
   voiceovers: {
     icon: IconMicrophone,
-    label: "Voiceovers",
+    label: "配音",
   },
   sfx: {
     icon: IconWaveSine,
-    label: "SFX",
+    label: "音效",
   },
   transitions: {
     icon: IconArrowsLeftRight,
-    label: "Transitions",
+    label: "转场",
   },
   effects: {
     icon: IconSparkles,
-    label: "Effects",
+    label: "特效",
   },
 };
 

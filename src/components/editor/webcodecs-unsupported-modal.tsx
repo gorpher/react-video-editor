@@ -25,25 +25,21 @@ export function WebCodecsUnsupportedModal({
     <Dialog open={open}>
       <DialogContent showCloseButton={false} className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Browser Not Supported</DialogTitle>
-          <DialogDescription>
-            WebCodecs is required for this editor to render and export video.
-          </DialogDescription>
+          <DialogTitle>浏览器不支持</DialogTitle>
+          <DialogDescription>此编辑器需要 WebCodecs 支持才能渲染和导出视频。</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           {reason === "insecure_context" ? (
             <p className="text-sm text-muted-foreground">
-              This page is running on an insecure origin{origin ? ` (${origin})` : ""}. WebCodecs
-              requires a secure context. Use `https://` or open via `localhost`.
+              当前页面运行在不安全的源{origin ? `（${origin}）` : ""}。WebCodecs
+              需要安全上下文，请使用 https:// 或通过 localhost 访问。
             </p>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              Your runtime is missing required WebCodecs APIs.
-            </p>
+            <p className="text-sm text-muted-foreground">当前运行环境缺少必要的 WebCodecs API。</p>
           )}
           {missingApis.length > 0 && (
             <div>
-              <p className="font-medium text-sm mb-2">Missing APIs:</p>
+              <p className="font-medium text-sm mb-2">缺少以下 API：</p>
               <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
                 {missingApis.map((api) => (
                   <li key={api}>{api}</li>
@@ -52,15 +48,15 @@ export function WebCodecsUnsupportedModal({
             </div>
           )}
           <div>
-            <p className="font-medium text-sm mb-2">Please use one of the following browsers:</p>
+            <p className="font-medium text-sm mb-2">请使用以下浏览器之一：</p>
             <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-              <li>Google Chrome (version 94+)</li>
-              <li>Microsoft Edge (version 94+)</li>
-              <li>Opera (version 80+)</li>
+              <li>Google Chrome（94 及以上版本）</li>
+              <li>Microsoft Edge（94 及以上版本）</li>
+              <li>Opera（80 及以上版本）</li>
             </ul>
           </div>
           <p className="text-xs text-muted-foreground">
-            Note: Safari and Firefox do not currently support WebCodecs.
+            注意：Safari 和 Firefox 目前不支持 WebCodecs。
           </p>
         </div>
       </DialogContent>

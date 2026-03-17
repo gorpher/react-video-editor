@@ -63,7 +63,7 @@ export function TimelineToolbar({
                 <Scissors className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Split element (Ctrl+S)</TooltipContent>
+            <TooltipContent>分割 (Ctrl+S)</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -72,7 +72,7 @@ export function TimelineToolbar({
                 <Copy className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Duplicate element (Ctrl+D)</TooltipContent>
+            <TooltipContent>复制 (Ctrl+D)</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -81,7 +81,7 @@ export function TimelineToolbar({
                 <Trash2 className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Delete element (Delete)</TooltipContent>
+            <TooltipContent>删除 (Delete)</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -89,7 +89,7 @@ export function TimelineToolbar({
                 <Magnet className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Auto snapping</TooltipContent>
+            <TooltipContent>自动吸附</TooltipContent>
           </Tooltip>
         </TooltipProvider>
       </div>
@@ -102,7 +102,7 @@ export function TimelineToolbar({
                 <IconPlayerSkipBack className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Return to Start (Home / Enter)</TooltipContent>
+            <TooltipContent>回到起点 (Home / Enter)</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -114,7 +114,7 @@ export function TimelineToolbar({
                 )}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{isPlaying ? "Pause (Space)" : "Play (Space)"}</TooltipContent>
+            <TooltipContent>{isPlaying ? "暂停 (Space)" : "播放 (Space)"}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -122,7 +122,7 @@ export function TimelineToolbar({
                 <IconPlayerSkipForward className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Return to Start (Home / Enter)</TooltipContent>
+            <TooltipContent>回到起点 (Home / Enter)</TooltipContent>
           </Tooltip>
           {/* Time Display */}
           <div className="flex flex-row items-center justify-center px-2">

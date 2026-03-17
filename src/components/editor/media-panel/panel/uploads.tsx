@@ -467,7 +467,7 @@ export default function PanelUploads() {
   if (!isLoaded) {
     return (
       <div className="h-full flex items-center justify-center">
-        <span className="text-sm text-muted-foreground">Loading...</span>
+        <span className="text-sm text-muted-foreground">加载中...</span>
       </div>
     );
   }
@@ -492,7 +492,7 @@ export default function PanelUploads() {
               </InputGroupAddon>
 
               <InputGroupInput
-                placeholder="Search assets..."
+                placeholder="搜索素材..."
                 className="bg-secondary/30 border-0 h-full text-xs box-border pl-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -516,19 +516,19 @@ export default function PanelUploads() {
               variant={"outline"}
               className="w-full"
             >
-              <Upload size={14} /> Upload
+              <Upload size={14} /> 上传
             </Button>
           </div>
         </div>
       )}
 
       {isRemoteLoading && (
-        <div className="px-4 pb-2 text-[11px] text-muted-foreground">Loading AIFilm library...</div>
+        <div className="px-4 pb-2 text-[11px] text-muted-foreground">正在加载 AIFilm 素材库...</div>
       )}
 
       {remoteError && (
         <div className="px-4 pb-2 text-[11px] text-amber-600 dark:text-amber-400">
-          AIFilm library unavailable: {remoteError}
+          AIFilm 素材库不可用：{remoteError}
         </div>
       )}
 
@@ -538,7 +538,7 @@ export default function PanelUploads() {
           <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2">
             <Upload size={32} className="opacity-50" />
             <span className="text-sm">
-              {mergedAssets.length === 0 ? "No assets yet" : "No matches found"}
+              {mergedAssets.length === 0 ? "暂无素材" : "未找到匹配素材"}
             </span>
           </div>
         ) : (
