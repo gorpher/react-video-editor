@@ -118,9 +118,10 @@ export async function regenerateCaptionClips({
   });
 
   const clipsToAdd: IClip[] = [];
+  const paddingY = styleUpdate?.textBoxStyle?.verticalPadding ?? 0;
 
   for (const json of newClipsJSON) {
-    const uniformTop = json.top ?? 0;
+    const uniformTop = json.top != null ? json.top - paddingY * 3 : 0;
     const enrichedJson: any = {
       ...json,
       mediaId,
@@ -182,6 +183,7 @@ export async function regenerateCaptionClips({
       if (styleUpdate.align) enrichedJson.style.align = styleUpdate.align;
       if (styleUpdate.fontFamily) enrichedJson.style.fontFamily = styleUpdate.fontFamily;
       if (styleUpdate.fontUrl) enrichedJson.style.fontUrl = styleUpdate.fontUrl;
+      if (styleUpdate.fontSize) enrichedJson.style.fontSize = styleUpdate.fontSize;
 
       if (styleUpdate.strokeWidth !== undefined || styleUpdate.stroke) {
         if (typeof enrichedJson.style.stroke !== "object" || enrichedJson.style.stroke === null) {

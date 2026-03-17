@@ -22,6 +22,7 @@ export interface ICaptionsControlProps {
   previewUrl?: string;
   textAlign?: string;
   preservedColorKeyWord?: boolean;
+  fontSize?: number;
   wordAnimation?: {
     type: "scale" | "opacity";
     application: "active" | "keyword" | "none";
@@ -34,5 +35,6 @@ export interface ICaptionsControlProps {
     maxLines?: number;
     borderRadius?: number;
     horizontalPadding?: number;
+    verticalPadding?: number;
   };
 }
