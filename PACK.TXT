@@ -1,0 +1,8 @@
+1 交付机打包：npm run offline:pack
+2 到 offline-bundle\yyyyMMdd_HHmmss 拿交付目录
+3 目标机部署：powershell -ExecutionPolicy Bypass -File .\Deploy-OfflineBundle.ps1
+4 目标机验收：powershell -ExecutionPolicy Bypass -File .\Verify-OfflineBundle.ps1
+
+部署前记得在 .env 填好 AIFILM_API_BASE_URL（指向独立 AIFilm 服务地址，不要用容器内 localhost）。
+
+

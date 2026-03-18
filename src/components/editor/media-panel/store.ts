@@ -21,6 +21,7 @@ export type Tab =
   | "text"
   | "captions"
   | "effects"
+  | "elements"
   | "voiceovers"
   | "sfx"
   | "transitions";

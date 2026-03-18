@@ -99,6 +99,33 @@ An advanced, AI-powered video editor that leverages **WebCodecs API** for high-p
 
 5.  Open [http://localhost:5000](http://localhost:5000) with your browser to see the result.
 
+## Offline Delivery (Independent Package)
+
+This repository can be packaged and deployed offline as an independent bundle (`web + postgres`).
+AIFilm should stay as a separate service and communicate through HTTP (`AIFILM_API_BASE_URL`).
+Postgres is internal-only in compose and is not mapped to a host port.
+
+1. Build and pack on delivery machine:
+
+   ```powershell
+   npm run offline:pack
+   ```
+
+2. Deploy on target machine:
+
+   ```powershell
+   npm run offline:deploy
+   ```
+
+3. Verify deployment:
+
+   ```powershell
+   npm run offline:verify
+   ```
+
+Bundle output defaults to: `offline-bundle\yyyyMMdd_HHmmss`.
+Remember to set `AIFILM_API_BASE_URL` in `.env` to the independent AIFilm HTTP address.
+
 ## License
 
 **OpenVideo** is dual-licensed:
