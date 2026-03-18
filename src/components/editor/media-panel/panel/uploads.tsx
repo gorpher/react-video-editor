@@ -197,10 +197,17 @@ export default function PanelUploads() {
       const payload = (await response.json().catch(() => ({}))) as {
         items?: AifilmMediaItem[];
         error?: string;
+        unavailable?: boolean;
       };
 
       if (!response.ok) {
-        throw new Error(payload.error || "Failed to load AIFilm media.");
+        console.warn("[AIFilmMedia] Uploads panel list request unavailable", {
+          status: response.status,
+          message: payload.error || "Failed to load AIFilm media.",
+        });
+        setRemoteAssets([]);
+        setRemoteError(payload.error || "AIFilm media is unavailable right now.");
+        return;
       }
 
       const assets = (payload.items || [])
@@ -211,13 +218,17 @@ export default function PanelUploads() {
         count: assets.length,
       });
       setRemoteAssets(assets);
-      setRemoteError(null);
+      if (payload.unavailable) {
+        setRemoteError(payload.error || "AIFilm media is unavailable right now.");
+      } else {
+        setRemoteError(null);
+      }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
 
-      console.error("[AIFilmMedia] Failed to load uploads panel assets", error);
+      console.warn("[AIFilmMedia] Failed to load uploads panel assets", error);
       setRemoteAssets([]);
       setRemoteError(error instanceof Error ? error.message : "Failed to load AIFilm media.");
     } finally {

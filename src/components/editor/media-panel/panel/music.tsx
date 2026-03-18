@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useStudioStore } from "@/stores/studio-store";
 import { Audio, Log } from "openvideo";
 import { IconMusic } from "@tabler/icons-react";
@@ -28,10 +28,7 @@ export default function PanelMusic() {
   const [searchQuery, setSearchQuery] = useState("");
   const [items, setItems] = useState<AudioAsset[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  let fileInputEl: HTMLInputElement | null = null;
-  const fileInputRef = useCallback((node: HTMLInputElement | null) => {
-    if (node) fileInputEl = node;
-  }, []);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
     const stored: any[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
@@ -123,7 +120,11 @@ export default function PanelMusic() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </InputGroup>
-        <Button variant="outline" disabled={isUploading} onClick={() => fileInputEl?.click()}>
+        <Button
+          variant="outline"
+          disabled={isUploading}
+          onClick={() => fileInputRef.current?.click()}
+        >
           <Upload size={14} />
         </Button>
       </div>

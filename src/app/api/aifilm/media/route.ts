@@ -29,21 +29,32 @@ function getErrorMessage(payload: unknown, fallback: string) {
   return fallback;
 }
 
+function safeParseJson(text: string) {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(request: NextRequest) {
   if (!getAifilmApiBaseUrl()) {
-    return NextResponse.json(
-      {
-        error:
-          "AIFilm API base URL is not configured. Set AIFILM_API_BASE_URL or NEXT_PUBLIC_AIFILM_API_BASE_URL.",
-      },
-      { status: 503 },
-    );
+    return NextResponse.json({
+      items: [],
+      unavailable: true,
+      error:
+        "AIFilm API base URL is not configured. Set AIFILM_API_BASE_URL or NEXT_PUBLIC_AIFILM_API_BASE_URL.",
+    });
   }
 
   const requestUrl = new URL(request.url);
   const upstreamUrl = buildAifilmApiUrl("/api/v1/media", requestUrl.search);
   if (!upstreamUrl) {
-    return NextResponse.json({ error: "AIFilm API base URL is invalid." }, { status: 503 });
+    return NextResponse.json({
+      items: [],
+      unavailable: true,
+      error: "AIFilm API base URL is invalid.",
+    });
   }
 
   try {
@@ -51,20 +62,45 @@ export async function GET(request: NextRequest) {
       headers: buildAifilmRequestHeaders(request.headers),
       cache: "no-store",
     });
+
     const text = await response.text();
-    const payload = text ? (JSON.parse(text) as { items?: AifilmMediaItem[] }) : {};
+    const parsedPayload = text ? safeParseJson(text) : {};
+    const payload =
+      parsedPayload && typeof parsedPayload === "object"
+        ? (parsedPayload as { items?: AifilmMediaItem[] })
+        : null;
 
     if (!response.ok) {
-      const errorMessage = getErrorMessage(payload, "Failed to load AIFilm media.");
-      console.error("[AIFilmMedia] Failed to fetch list", {
+      const errorMessage = getErrorMessage(
+        payload ?? text,
+        "AIFilm media is temporarily unavailable.",
+      );
+      console.warn("[AIFilmMedia] Upstream list request unavailable", {
         status: response.status,
         upstreamUrl,
         errorMessage,
       });
-      return NextResponse.json({ error: errorMessage }, { status: response.status });
+      return NextResponse.json({
+        items: [],
+        unavailable: true,
+        error: errorMessage,
+      });
     }
 
-    const items = Array.isArray(payload.items)
+    if (text && !payload) {
+      console.warn("[AIFilmMedia] Upstream returned non-JSON list payload", {
+        upstreamUrl,
+        status: response.status,
+        contentType: response.headers.get("content-type") ?? "unknown",
+      });
+      return NextResponse.json({
+        items: [],
+        unavailable: true,
+        error: "AIFilm media returned an unexpected response format.",
+      });
+    }
+
+    const items = Array.isArray(payload?.items)
       ? payload.items.map((item) => ({
           ...item,
           url: toAifilmProxyMediaUrl(item.url),
@@ -72,9 +108,13 @@ export async function GET(request: NextRequest) {
       : [];
 
     console.info("[AIFilmMedia] Loaded media list", { count: items.length });
-    return NextResponse.json({ items });
+    return NextResponse.json({ items, unavailable: false });
   } catch (error) {
-    console.error("[AIFilmMedia] Unexpected list proxy error", error);
-    return NextResponse.json({ error: "Failed to load AIFilm media." }, { status: 500 });
+    console.warn("[AIFilmMedia] Unexpected list proxy error", error);
+    return NextResponse.json({
+      items: [],
+      unavailable: true,
+      error: "AIFilm media is temporarily unavailable.",
+    });
   }
 }

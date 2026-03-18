@@ -15,11 +15,152 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Video, Music, Clock } from "lucide-react";
 import { useStudioStore } from "@/stores/studio-store";
+import { storageService } from "@/lib/storage/storage-service";
 
 interface ExportModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+type ExportClipJSON = {
+  id?: string;
+  type?: string;
+  src?: string;
+  name?: string;
+  [key: string]: any;
+};
+
+type LocalUploadAsset = {
+  id?: string;
+  type?: string;
+  name?: string;
+  src?: string;
+};
+
+const STORAGE_KEY = "designcombo_uploads";
+const PROJECT_ID = "local-uploads";
+const CLIP_TYPES_WITHOUT_SOURCE = new Set(["Text", "Caption", "Effect", "Transition"]);
+
+const parseLocalUploads = (): LocalUploadAsset[] => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const canReadBlobSource = async (src: string): Promise<boolean> => {
+  try {
+    const response = await fetch(src);
+    return response.ok;
+  } catch {
+    return false;
+  }
+};
+
+const pushUniqueUrl = (target: Map<string, string[]>, key: string, url: string) => {
+  if (!key || !url) return;
+  const existing = target.get(key) || [];
+  if (!existing.includes(url)) {
+    target.set(key, [...existing, url]);
+  }
+};
+
+const buildMediaSourceRecoveryMap = async () => {
+  const localAssets = parseLocalUploads();
+  const freshUrlById = new Map<string, string>();
+  const urlsByName = new Map<string, string[]>();
+  const replacementByOldSrc = new Map<string, string>();
+
+  if (storageService.isOPFSSupported()) {
+    const localFiles = await storageService.loadAllMediaFiles({ projectId: PROJECT_ID });
+    for (const file of localFiles) {
+      if (file.id && file.url) {
+        freshUrlById.set(file.id, file.url);
+      }
+      if (file.name && file.url) {
+        pushUniqueUrl(urlsByName, file.name, file.url);
+      }
+    }
+  }
+
+  for (const asset of localAssets) {
+    const assetSrc = typeof asset.src === "string" ? asset.src.trim() : "";
+    const assetName = typeof asset.name === "string" ? asset.name.trim() : "";
+    const assetId = typeof asset.id === "string" ? asset.id : "";
+
+    if (!assetSrc) continue;
+
+    if (assetId && freshUrlById.has(assetId)) {
+      replacementByOldSrc.set(assetSrc, freshUrlById.get(assetId)!);
+    }
+
+    if (assetName) {
+      pushUniqueUrl(urlsByName, assetName, assetSrc);
+    }
+  }
+
+  return {
+    replacementByOldSrc,
+    urlsByName,
+  };
+};
+
+const repairClipSourcesForExport = async (clips: ExportClipJSON[]) => {
+  const { replacementByOldSrc, urlsByName } = await buildMediaSourceRecoveryMap();
+  const repairedClips: ExportClipJSON[] = [];
+  const unresolvedClipNames: string[] = [];
+  let repairedCount = 0;
+
+  for (const clip of clips) {
+    const clipType = clip?.type || "";
+    if (CLIP_TYPES_WITHOUT_SOURCE.has(clipType)) {
+      repairedClips.push(clip);
+      continue;
+    }
+
+    const src = typeof clip?.src === "string" ? clip.src.trim() : "";
+    if (!src) {
+      continue;
+    }
+
+    if (!src.startsWith("blob:")) {
+      repairedClips.push(clip);
+      continue;
+    }
+
+    if (await canReadBlobSource(src)) {
+      repairedClips.push(clip);
+      continue;
+    }
+
+    let replacementSrc = replacementByOldSrc.get(src);
+
+    if (!replacementSrc && typeof clip.name === "string") {
+      const byNameCandidates = urlsByName.get(clip.name.trim()) || [];
+      replacementSrc = byNameCandidates.find(Boolean);
+    }
+
+    if (replacementSrc) {
+      repairedClips.push({
+        ...clip,
+        src: replacementSrc,
+      });
+      repairedCount += 1;
+    } else {
+      unresolvedClipNames.push(clip.name || clip.id || "Unknown clip");
+    }
+  }
+
+  return {
+    repairedClips,
+    repairedCount,
+    unresolvedClipNames: Array.from(new Set(unresolvedClipNames)),
+  };
+};
 
 // ---------------------------------------------------------------------------
 // Option definitions (sourced from mediabunny's supported formats/codecs)
@@ -170,10 +311,23 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
       const json = studio.exportToJSON();
       if (!json.clips || json.clips.length === 0) throw new Error("No clips to export");
 
-      const validClips = json.clips.filter((clipJSON: any) => {
+      const { repairedClips, repairedCount, unresolvedClipNames } =
+        await repairClipSourcesForExport(json.clips as ExportClipJSON[]);
+
+      if (repairedCount > 0) {
+        toast.info(`Recovered ${repairedCount} local media source(s) before export.`);
+      }
+
+      if (unresolvedClipNames.length > 0) {
+        throw new Error(
+          `Some media sources are no longer available: ${unresolvedClipNames.join(", ")}`,
+        );
+      }
+
+      const validClips = repairedClips.filter((clipJSON: any) => {
         if (["Text", "Caption", "Effect", "Transition"].includes(clipJSON.type)) return true;
         return clipJSON.src && clipJSON.src.trim() !== "";
-      });
+      }) as any[];
       if (validClips.length === 0) throw new Error("No valid clips to export");
 
       const settings = json.settings || {};
@@ -196,7 +350,7 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
 
       com.on("OutputProgress", (v) => setExportProgress(v));
 
-      await com.loadFromJSON({ ...json, clips: validClips });
+      await com.loadFromJSON({ ...json, clips: validClips } as any);
       const stream = com.output();
       const blob = await new Response(stream).blob();
       const blobUrl = URL.createObjectURL(blob);
