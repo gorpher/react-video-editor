@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useStudioStore } from "@/stores/studio-store";
-import { getTransitionOptions, registerCustomTransition } from "openvideo";
+import { getTransitionOptions, registerCustomTransition, type IClip, type Studio } from "openvideo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const TRANSITION_DURATION_DEFAULT = 2_000_000;
+const TRANSITION_DURATION_MIN = 100_000;
+const MEDIA_TRANSITION_TYPES = new Set(["Video", "Image"]);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -16,6 +19,137 @@ type CustomPreset = {
   data: { label: string; fragment: string };
   published: boolean;
   userId: string;
+};
+
+type TransitionPair = {
+  fromClip: IClip;
+  toClip: IClip;
+};
+
+const isTransitionMediaClip = (clip: IClip | null | undefined): clip is IClip => {
+  return !!clip && MEDIA_TRANSITION_TYPES.has(clip.type);
+};
+
+const getTrackIdByClipId = (studio: Studio, clipId: string): string | undefined => {
+  return studio.getTracks().find((track) => track.clipIds.includes(clipId))?.id;
+};
+
+const computeTransitionDuration = (fromClip: IClip, toClip: IClip): number => {
+  const minDuration = Math.min(fromClip.duration ?? Infinity, toClip.duration ?? Infinity);
+
+  if (!Number.isFinite(minDuration)) {
+    return TRANSITION_DURATION_DEFAULT;
+  }
+
+  return Math.max(TRANSITION_DURATION_MIN, minDuration * 0.25);
+};
+
+const resolveTransitionPairFromSelection = (
+  studio: Studio,
+  selectedClips: IClip[],
+): TransitionPair | { error: string } => {
+  const mediaSelected = selectedClips.filter(isTransitionMediaClip);
+
+  if (mediaSelected.length === 2) {
+    const [first, second] = mediaSelected;
+    const firstTrackId = getTrackIdByClipId(studio, first.id);
+    const secondTrackId = getTrackIdByClipId(studio, second.id);
+
+    if (!firstTrackId || !secondTrackId || firstTrackId !== secondTrackId) {
+      return { error: "请在同一轨道选择两个视频/图片片段后再添加转场。" };
+    }
+
+    if (first.id === second.id) {
+      return { error: "转场需要两个不同的片段。" };
+    }
+
+    return first.display.from <= second.display.from
+      ? { fromClip: first, toClip: second }
+      : { fromClip: second, toClip: first };
+  }
+
+  if (mediaSelected.length > 2) {
+    return { error: "当前选中了超过两个片段，请只保留一个或两个片段后再添加转场。" };
+  }
+
+  if (mediaSelected.length === 1) {
+    const baseClip = mediaSelected[0];
+    const trackId = getTrackIdByClipId(studio, baseClip.id);
+    const track = trackId ? studio.getTracks().find((t) => t.id === trackId) : undefined;
+
+    if (!track) {
+      return { error: "未找到当前片段所在轨道，无法添加转场。" };
+    }
+
+    const trackMediaClips = track.clipIds
+      .map((id) => studio.getClipById(id))
+      .filter(isTransitionMediaClip)
+      .sort((a, b) => a.display.from - b.display.from);
+
+    const currentIndex = trackMediaClips.findIndex((clip) => clip.id === baseClip.id);
+    if (currentIndex === -1) {
+      return { error: "当前片段不在可转场列表中。" };
+    }
+
+    const prevClip = trackMediaClips[currentIndex - 1];
+    const nextClip = trackMediaClips[currentIndex + 1];
+
+    if (!prevClip && !nextClip) {
+      return { error: "当前轨道没有可连接的相邻视频/图片片段。" };
+    }
+
+    if (prevClip && nextClip) {
+      const prevGap = Math.abs(baseClip.display.from - prevClip.display.to);
+      const nextGap = Math.abs(nextClip.display.from - baseClip.display.to);
+      return prevGap <= nextGap
+        ? { fromClip: prevClip, toClip: baseClip }
+        : { fromClip: baseClip, toClip: nextClip };
+    }
+
+    if (nextClip) {
+      return { fromClip: baseClip, toClip: nextClip };
+    }
+
+    return { fromClip: prevClip!, toClip: baseClip };
+  }
+
+  return { error: "请先在时间线上选中一个或两个视频/图片片段，再添加转场。" };
+};
+
+const addTransitionFromSelection = async ({
+  studio,
+  selectedClips,
+  transitionKey,
+  transitionLabel,
+}: {
+  studio: Studio | null;
+  selectedClips: IClip[];
+  transitionKey: string;
+  transitionLabel: string;
+}) => {
+  if (!studio) {
+    toast.error("编辑器尚未初始化。");
+    return;
+  }
+
+  const currentSelection = selectedClips.length > 0 ? selectedClips : studio.getSelectedClips();
+  const pairOrError = resolveTransitionPairFromSelection(studio, currentSelection);
+
+  if ("error" in pairOrError) {
+    toast.error(pairOrError.error);
+    return;
+  }
+
+  const { fromClip, toClip } = pairOrError;
+  const duration = computeTransitionDuration(fromClip, toClip);
+
+  try {
+    await studio.addTransition(transitionKey, duration, fromClip.id, toClip.id);
+    toast.success(`已添加转场：${transitionLabel}`);
+  } catch (error) {
+    console.error("Failed to add transition from media panel", error);
+    toast.error("添加转场失败，请重试。");
+  }
 };
 
 // ─── Shared card for built-in transitions ─────────────────────────────────────
@@ -93,7 +227,7 @@ const TransitionCard = ({
 // ─── Default Transitions ──────────────────────────────────────────────────────
 
 const TransitionDefault = () => {
-  const { studio } = useStudioStore();
+  const { studio, selectedClips } = useStudioStore();
   const allTransitions = getTransitionOptions();
 
   return (
@@ -105,10 +239,14 @@ const TransitionDefault = () => {
           label={effect.label}
           previewStatic={effect.previewStatic}
           previewDynamic={effect.previewDynamic}
-          onClick={() => {
-            if (!studio) return;
-            studio.addTransition(effect.key, TRANSITION_DURATION_DEFAULT);
-          }}
+          onClick={() =>
+            addTransitionFromSelection({
+              studio,
+              selectedClips,
+              transitionKey: effect.key,
+              transitionLabel: effect.label,
+            })
+          }
         />
       ))}
     </div>
@@ -118,7 +256,7 @@ const TransitionDefault = () => {
 // ─── Custom Transitions (from DB) ────────────────────────────────────────────
 
 const TransitionCustom = () => {
-  const { studio } = useStudioStore();
+  const { studio, selectedClips } = useStudioStore();
   const [ownPresets, setOwnPresets] = useState<CustomPreset[]>([]);
   const [publishedPresets, setPublishedPresets] = useState<CustomPreset[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -153,7 +291,12 @@ const TransitionCustom = () => {
       label: preset.data.label || preset.name,
       fragment: preset.data.fragment,
     } as any);
-    studio.addTransition(key, TRANSITION_DURATION_DEFAULT);
+    await addTransitionFromSelection({
+      studio,
+      selectedClips,
+      transitionKey: key,
+      transitionLabel: preset.data.label || preset.name,
+    });
   };
 
   if (isLoading) {
