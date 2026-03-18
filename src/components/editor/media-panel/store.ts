@@ -69,6 +69,10 @@ export const tabs: {
     icon: IconSparkles,
     label: "特效",
   },
+  elements: {
+    icon: IconSparkles,
+    label: "元素",
+  },
 };
 
 interface MediaPanelStore {

@@ -211,7 +211,7 @@ export function TransitionProperties({ clip }: TransitionPropertiesProps) {
         setOwnPresets(json.own ?? []);
         setPublishedPresets(json.published ?? []);
       } catch {
-        setPresetsError("Could not load custom transitions.");
+        setPresetsError("无法加载自定义转场。");
       } finally {
         setPresetsLoading(false);
       }
@@ -253,7 +253,7 @@ export function TransitionProperties({ clip }: TransitionPropertiesProps) {
       {/* Duration Section */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Duration
+          时长
         </label>
         <div className="flex gap-2">
           <div className="flex items-center gap-4 flex-1">
@@ -291,10 +291,10 @@ export function TransitionProperties({ clip }: TransitionPropertiesProps) {
       <Tabs defaultValue="default" className="flex flex-col flex-1 min-h-0">
         <TabsList className="w-full shrink-0">
           <TabsTrigger value="default" className="flex-1">
-            Default
+            默认
           </TabsTrigger>
           <TabsTrigger value="custom" className="flex-1">
-            Custom
+            自定义
           </TabsTrigger>
         </TabsList>
 
@@ -320,7 +320,7 @@ export function TransitionProperties({ clip }: TransitionPropertiesProps) {
             {presetsLoading ? (
               <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
                 <Loader2 className="size-5 animate-spin" />
-                <span className="text-xs">Loading custom transitions…</span>
+                <span className="text-xs">正在加载自定义转场…</span>
               </div>
             ) : presetsError ? (
               <div className="flex items-center justify-center py-12 text-xs text-destructive">
@@ -328,13 +328,13 @@ export function TransitionProperties({ clip }: TransitionPropertiesProps) {
               </div>
             ) : ownPresets.length === 0 && publishedPresets.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
-                <span className="text-xs">No custom transitions yet.</span>
-                <span className="text-[10px]">Create one from the Gallery to see it here.</span>
+                <span className="text-xs">暂无自定义转场。</span>
+                <span className="text-[10px]">可在素材库创建后在此查看。</span>
               </div>
             ) : (
               <div className="grid grid-cols-[repeat(auto-fill,minmax(92px,1fr))] gap-2.5 justify-items-center">
                 {ownPresets.map((p) => renderCustomPreset(p))}
-                {publishedPresets.map((p) => renderCustomPreset(p, "Public"))}
+                {publishedPresets.map((p) => renderCustomPreset(p, "公共"))}
               </div>
             )}
           </ScrollArea>

@@ -6,8 +6,8 @@ import { Text, Log } from "openvideo";
 
 const TEXT_PRESETS = [
   {
-    name: "Heading",
-    description: "Heading",
+    name: "标题",
+    description: "标题文本",
     style: {
       fontSize: 80,
       fontFamily: "Inter",
@@ -16,8 +16,8 @@ const TEXT_PRESETS = [
     },
   },
   {
-    name: "Body text",
-    description: "Body text",
+    name: "正文",
+    description: "正文文本",
     style: {
       fontSize: 40,
       fontFamily: "Inter",
@@ -26,8 +26,8 @@ const TEXT_PRESETS = [
     },
   },
   {
-    name: "Modern Bold",
-    description: "MODERN",
+    name: "现代粗体",
+    description: "现代",
     style: {
       fontSize: 60,
       fontFamily: "Montserrat",
@@ -37,8 +37,8 @@ const TEXT_PRESETS = [
     },
   },
   {
-    name: "Elegant Serif",
-    description: "Serif Style",
+    name: "优雅衬线",
+    description: "衬线风格",
     style: {
       fontSize: 60,
       fontFamily: "Playfair Display",
@@ -48,8 +48,8 @@ const TEXT_PRESETS = [
     },
   },
   {
-    name: "Neon Glow",
-    description: "NEON",
+    name: "霓虹发光",
+    description: "霓虹",
     style: {
       fontSize: 60,
       fontFamily: "Inter",
@@ -65,8 +65,8 @@ const TEXT_PRESETS = [
     },
   },
   {
-    name: "Handwritten",
-    description: "Script",
+    name: "手写体",
+    description: "手写",
     style: {
       fontSize: 70,
       fontFamily: "Dancing Script",
@@ -103,7 +103,7 @@ export default function PanelText() {
     if (!studio) return;
 
     try {
-      const textClip = new Text(preset ? preset.description : "Add Text pro", {
+      const textClip = new Text(preset ? preset.description : "添加文字", {
         fontSize: preset?.style.fontSize || 124,
         fontFamily: preset?.style.fontFamily || "Arial",
         align: "center",
@@ -116,7 +116,7 @@ export default function PanelText() {
         wordWrapWidth: 800,
         fontUrl: (preset?.style as any)?.fontUrl,
       });
-      textClip.name = preset ? preset.name : "Text";
+      textClip.name = preset ? preset.name : "文字";
       await textClip.ready;
       textClip.display.from = 0;
       textClip.duration = 5e6;

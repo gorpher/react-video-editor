@@ -239,20 +239,20 @@ export function CaptionProperties({ clip }: CaptionPropertiesProps) {
       {/* Content */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Content
+          内容
         </label>
         <Textarea
           value={captionClip.text || ""}
           onChange={(e) => handleUpdate({ text: e.target.value })}
           className="resize-none text-sm"
-          placeholder="Enter caption text..."
+          placeholder="输入字幕文本..."
         />
       </div>
 
       {/* Transform Section */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Transform
+          变换
         </label>
         <div className="grid grid-cols-2 gap-2">
           <InputGroup>
@@ -307,19 +307,19 @@ export function CaptionProperties({ clip }: CaptionPropertiesProps) {
       {/* Position Section */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Position
+          位置
         </label>
         <Select
           value={opts.verticalAlign || "bottom"}
           onValueChange={(v) => updateVerticalAlign(v, captionClip, handleUpdate)}
         >
           <SelectTrigger className="w-full h-9">
-            <SelectValue placeholder="Vertical Position" />
+            <SelectValue placeholder="垂直位置" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="top">Top</SelectItem>
-            <SelectItem value="center">Center</SelectItem>
-            <SelectItem value="bottom">Bottom</SelectItem>
+            <SelectItem value="top">顶部</SelectItem>
+            <SelectItem value="center">居中</SelectItem>
+            <SelectItem value="bottom">底部</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -327,18 +327,18 @@ export function CaptionProperties({ clip }: CaptionPropertiesProps) {
       {/* Words per line Section */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Words per line
+          每行词数
         </label>
         <Select
           value={captionClip.wordsPerLine || "multiple"}
           onValueChange={(v) => changeWordsPerLine(v, captionClip, opts)}
         >
           <SelectTrigger className="w-full h-9">
-            <SelectValue placeholder="Words per line" />
+            <SelectValue placeholder="每行词数" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="single">Single</SelectItem>
-            <SelectItem value="multiple">Multiple</SelectItem>
+            <SelectItem value="single">单词模式</SelectItem>
+            <SelectItem value="multiple">多词模式</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -346,7 +346,7 @@ export function CaptionProperties({ clip }: CaptionPropertiesProps) {
       {/* Rotation Section */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Rotation
+          旋转
         </label>
         <div className="flex items-center gap-4">
           <IconRotate className="size-4 text-muted-foreground" />
@@ -374,7 +374,7 @@ export function CaptionProperties({ clip }: CaptionPropertiesProps) {
       {/* Font Section */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Font
+          字体
         </label>
 
         <Select
@@ -387,7 +387,7 @@ export function CaptionProperties({ clip }: CaptionPropertiesProps) {
           }}
         >
           <SelectTrigger className="w-full h-12">
-            <SelectValue placeholder="Select font">
+            <SelectValue placeholder="选择字体">
               <div className="flex items-center h-full">{currentFamily.family}</div>
             </SelectValue>
           </SelectTrigger>
@@ -409,12 +409,12 @@ export function CaptionProperties({ clip }: CaptionPropertiesProps) {
         <div className="grid grid-cols-2 gap-2">
           <Select value={currentFont.postScriptName} onValueChange={(v) => handleFontChange(v)}>
             <SelectTrigger className="bg-input border h-9 w-full overflow-hidden">
-              <SelectValue placeholder="Style" />
+              <SelectValue placeholder="样式" />
             </SelectTrigger>
             <SelectContent>
               {currentFamily.styles.map((style) => (
                 <SelectItem key={style.id} value={style.postScriptName}>
-                  {style.fullName.replace(currentFamily.family, "").trim() || "Regular"}
+                  {style.fullName.replace(currentFamily.family, "").trim() || "常规"}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -444,7 +444,7 @@ export function CaptionProperties({ clip }: CaptionPropertiesProps) {
       {/* Style Section */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Style
+          样式
         </label>
         <div className="grid grid-cols-2 gap-2">
           <div className="flex bg-secondary/30 rounded-md p-1 gap-1">
@@ -516,7 +516,7 @@ export function CaptionProperties({ clip }: CaptionPropertiesProps) {
       {/* Opacity Section */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Opacity
+          不透明度
         </label>
         <div className="flex items-center gap-4">
           <IconCircle className="size-4 text-muted-foreground" />
@@ -545,7 +545,7 @@ export function CaptionProperties({ clip }: CaptionPropertiesProps) {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-            Animations
+            动画
           </label>
           <button
             onClick={() => {
@@ -564,7 +564,7 @@ export function CaptionProperties({ clip }: CaptionPropertiesProps) {
           {animations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-4 border border-dashed rounded-md bg-white/5 opacity-50">
               <IconMovie className="size-6 mb-1" />
-              <span className="text-[10px]">No animations applied</span>
+              <span className="text-[10px]">暂无动画</span>
             </div>
           ) : (
             animations.map((anim: any) => (
@@ -575,7 +575,7 @@ export function CaptionProperties({ clip }: CaptionPropertiesProps) {
                 <div className="flex flex-col flex-1">
                   <span className="text-xs font-medium capitalize">{anim.type}</span>
                   <span className="text-[10px] text-muted-foreground">
-                    {Math.round(anim.options.duration / 1e6)}s duration
+                    {Math.round(anim.options.duration / 1e6)} 秒
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
@@ -607,7 +607,7 @@ export function CaptionProperties({ clip }: CaptionPropertiesProps) {
       {/* Caption presets */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Presets
+          预设
         </label>
         <div className="relative w-full">
           <Button
@@ -616,7 +616,7 @@ export function CaptionProperties({ clip }: CaptionPropertiesProps) {
             onClick={() => setFloatingControl("caption-preset-picker")}
           >
             <div className="w-full text-left">
-              <p className="truncate">None</p>
+              <p className="truncate">无</p>
             </div>
             <ChevronDown className="text-muted-foreground" size={14} />
           </Button>
@@ -626,12 +626,12 @@ export function CaptionProperties({ clip }: CaptionPropertiesProps) {
       {/* Caption Colors Section */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Caption Colors
+          字幕颜色
         </label>
 
         {/* Appeared Color */}
         <div className="flex flex-col gap-1">
-          <span className="text-[9px] text-muted-foreground">Appeared</span>
+          <span className="text-[9px] text-muted-foreground">已出现</span>
           <InputGroup>
             <InputGroupAddon align="inline-start" className="relative p-0">
               <Popover modal={true}>
@@ -678,7 +678,7 @@ export function CaptionProperties({ clip }: CaptionPropertiesProps) {
 
         {/* Active Color */}
         <div className="flex flex-col gap-1">
-          <span className="text-[9px] text-muted-foreground">Active</span>
+          <span className="text-[9px] text-muted-foreground">高亮</span>
           <InputGroup>
             <InputGroupAddon align="inline-start" className="relative p-0">
               <Popover modal={true}>
@@ -725,7 +725,7 @@ export function CaptionProperties({ clip }: CaptionPropertiesProps) {
 
         {/* Active Fill Color */}
         <div className="flex flex-col gap-1">
-          <span className="text-[9px] text-muted-foreground">Active Fill</span>
+          <span className="text-[9px] text-muted-foreground">高亮填充</span>
           <InputGroup>
             <InputGroupAddon align="inline-start" className="relative p-0">
               <Popover modal={true}>
@@ -772,7 +772,7 @@ export function CaptionProperties({ clip }: CaptionPropertiesProps) {
 
         {/* Background Color */}
         <div className="flex flex-col gap-1">
-          <span className="text-[9px] text-muted-foreground">Background</span>
+          <span className="text-[9px] text-muted-foreground">背景</span>
           <InputGroup>
             <InputGroupAddon align="inline-start" className="relative p-0">
               <Popover modal={true}>
@@ -813,14 +813,14 @@ export function CaptionProperties({ clip }: CaptionPropertiesProps) {
               value={captionColors.background?.toUpperCase() || ""}
               onChange={(e) => handleCaptionColorUpdate({ background: e.target.value })}
               className="text-sm p-0 text-[10px] font-mono"
-              placeholder="Transparent"
+              placeholder="透明"
             />
           </InputGroup>
         </div>
 
         {/* Keyword Color */}
         <div className="flex flex-col gap-1">
-          <span className="text-[9px] text-muted-foreground">Keyword</span>
+          <span className="text-[9px] text-muted-foreground">关键词</span>
           <InputGroup>
             <InputGroupAddon align="inline-start" className="relative p-0">
               <Popover modal={true}>

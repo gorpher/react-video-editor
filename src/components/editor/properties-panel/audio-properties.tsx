@@ -20,7 +20,7 @@ export function AudioProperties({ clip }: AudioPropertiesProps) {
       {/* Volume Section */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Volume
+          音量
         </label>
         <div className="flex items-center gap-4">
           <IconVolume className="size-4 text-muted-foreground" />
@@ -48,7 +48,7 @@ export function AudioProperties({ clip }: AudioPropertiesProps) {
       {/* Pitch Section (UI Only) */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Pitch
+          音调
         </label>
         <div className="flex items-center gap-4">
           <IconMusic className="size-4 text-muted-foreground" />
@@ -73,7 +73,7 @@ export function AudioProperties({ clip }: AudioPropertiesProps) {
       {/* Speed Section (UI Only) */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Speed
+          速度
         </label>
         <div className="flex items-center gap-4">
           <IconGauge className="size-4 text-muted-foreground" />

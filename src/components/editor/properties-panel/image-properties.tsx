@@ -152,7 +152,7 @@ export function ImageProperties({ clip }: ImagePropertiesProps) {
       {/* Transform Section */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Transform
+          变换
         </label>
         <div className="grid grid-cols-2 gap-2">
           <InputGroup>
@@ -203,7 +203,7 @@ export function ImageProperties({ clip }: ImagePropertiesProps) {
       {/* Rotation Section */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Rotation
+          旋转
         </label>
         <div className="flex items-center gap-4">
           <IconRotate className="size-4 text-muted-foreground" />
@@ -230,7 +230,7 @@ export function ImageProperties({ clip }: ImagePropertiesProps) {
       {/* Opacity Section */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Opacity
+          不透明度
         </label>
         <div className="flex items-center gap-4">
           <IconCircle className="size-4 text-muted-foreground" />
@@ -258,7 +258,7 @@ export function ImageProperties({ clip }: ImagePropertiesProps) {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-            Animations
+            动画
           </label>
           <button
             onClick={() => {
@@ -277,7 +277,7 @@ export function ImageProperties({ clip }: ImagePropertiesProps) {
           {animations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-4 border border-dashed rounded-md bg-white/5 opacity-50">
               <IconMovie className="size-6 mb-1" />
-              <span className="text-[10px]">No animations applied</span>
+              <span className="text-[10px]">暂无动画</span>
             </div>
           ) : (
             animations.map((anim: any) => (
@@ -288,7 +288,7 @@ export function ImageProperties({ clip }: ImagePropertiesProps) {
                 <div className="flex flex-col flex-1">
                   <span className="text-xs font-medium capitalize">{anim.type}</span>
                   <span className="text-[10px] text-muted-foreground">
-                    {Math.round(anim.options.duration / 1e6)}s duration
+                    {Math.round(anim.options.duration / 1e6)} 秒
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
@@ -321,7 +321,7 @@ export function ImageProperties({ clip }: ImagePropertiesProps) {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-            Chroma Key
+            色度键
           </label>
           <Switch
             checked={imageClip.chromaKey?.enabled ?? false}
@@ -378,7 +378,7 @@ export function ImageProperties({ clip }: ImagePropertiesProps) {
 
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-muted-foreground">Similarity</span>
+                <span className="text-[10px] text-muted-foreground">相似度</span>
                 <span className="text-[10px] text-muted-foreground">
                   {Math.round((imageClip.chromaKey?.similarity ?? 0.1) * 100)}%
                 </span>
@@ -393,7 +393,7 @@ export function ImageProperties({ clip }: ImagePropertiesProps) {
 
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-muted-foreground">Spill</span>
+                <span className="text-[10px] text-muted-foreground">溢色抑制</span>
                 <span className="text-[10px] text-muted-foreground">
                   {Math.round((imageClip.chromaKey?.spill ?? 0.05) * 100)}%
                 </span>
@@ -412,7 +412,7 @@ export function ImageProperties({ clip }: ImagePropertiesProps) {
       {/* Radius Section */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Corner Radius
+          圆角
         </label>
         <div className="flex items-center gap-4">
           <IconSquare className="size-4 text-muted-foreground" />
@@ -440,7 +440,7 @@ export function ImageProperties({ clip }: ImagePropertiesProps) {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-            Stroke
+            描边
           </label>
           <button className="text-muted-foreground hover:text-white transition-colors">
             <IconMinus className="size-3" />
@@ -511,7 +511,7 @@ export function ImageProperties({ clip }: ImagePropertiesProps) {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-            Shadow
+            阴影
           </label>
         </div>
 

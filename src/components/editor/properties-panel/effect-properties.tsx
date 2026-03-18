@@ -68,38 +68,38 @@ interface PairPropertyProps {
 const TYPES_COLOR_GRADIENT_FILTER = [
   {
     value: 0,
-    label: "Linear",
+    label: "线性",
   },
   {
     value: 1,
-    label: "Radial",
+    label: "径向",
   },
   {
     value: 2,
-    label: "Conic",
+    label: "圆锥",
   },
 ];
 
 const TYPES_GLITCH_FILTER = [
   {
     value: 0,
-    label: "TRANSPARENT",
+    label: "透明",
   },
   {
     value: 1,
-    label: "ORIGINAL",
+    label: "原始",
   },
   {
     value: 2,
-    label: "LOOP",
+    label: "循环",
   },
   {
     value: 3,
-    label: "CLAMP",
+    label: "钳制",
   },
   {
     value: 4,
-    label: "MIRROR",
+    label: "镜像",
   },
 ];
 const EXTRA_PROPERTIES = {
@@ -170,7 +170,7 @@ const rgbaArrayToHex = (rgba: number[]): string => {
 const PairProperty = ({
   value,
   config,
-  labels = ["Start", "End"],
+  labels = ["起始", "结束"],
   onChange,
 }: PairPropertyProps) => {
   return (
@@ -253,7 +253,7 @@ const ReplacementsProperty = ({ value, onChange }: ReplacementsPropertyProps) =>
         </div>
       ))}
       <Button onClick={addReplacement} variant="outline" size="sm" className="w-full">
-        Add Replacement
+        添加替换
       </Button>
     </div>
   );
@@ -336,7 +336,7 @@ const StopsProperty = ({ value, config, onChange }: StopsPropertyProps) => {
 
           {/* Offset */}
           <div className="flex items-center gap-2">
-            <span className="text-xs w-12">Offset</span>
+            <span className="text-xs w-12">偏移</span>
             <Slider
               value={[stop.offset]}
               min={config.offset.min}
@@ -362,7 +362,7 @@ const StopsProperty = ({ value, config, onChange }: StopsPropertyProps) => {
 
           {/* Alpha */}
           <div className="flex items-center gap-2">
-            <span className="text-xs w-12">Alpha</span>
+            <span className="text-xs w-12">透明度</span>
             <Slider
               value={[stop.alpha]}
               min={config.alpha.min}
@@ -388,7 +388,7 @@ const StopsProperty = ({ value, config, onChange }: StopsPropertyProps) => {
         </div>
       ))}
       <Button onClick={addStop} variant="outline" size="sm" className="w-full">
-        Add Stop
+        添加色标
       </Button>
     </div>
   );
@@ -583,9 +583,7 @@ export function EffectProperties({ clip }: EffectPropertiesProps) {
 
   if (!hasProperties) {
     return (
-      <div className="text-sm text-muted-foreground italic text-center">
-        Properties not available for modification
-      </div>
+      <div className="text-sm text-muted-foreground italic text-center">当前特效无可调整项</div>
     );
   }
 
@@ -643,7 +641,7 @@ export function EffectProperties({ clip }: EffectPropertiesProps) {
                   onValueChange={(value) => handleUpdate(property, Number(value))}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a type" />
+                    <SelectValue placeholder="选择类型" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>

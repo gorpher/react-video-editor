@@ -93,7 +93,7 @@ const FontPicker = React.memo(
         onOpenChange={setIsOpen}
       >
         <SelectTrigger className="w-full h-12">
-          <SelectValue placeholder="Select font">
+          <SelectValue placeholder="选择字体">
             <div className="flex items-center h-full">{currentFamily.family}</div>
           </SelectValue>
         </SelectTrigger>
@@ -230,20 +230,20 @@ export function TextProperties({ clip }: TextPropertiesProps) {
       {/* Content */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Content
+          内容
         </label>
         <Textarea
           value={textClip.text || ""}
           onChange={(e) => handleUpdate({ text: e.target.value })}
           className="resize-none text-sm"
-          placeholder="Enter text..."
+          placeholder="输入文本..."
         />
       </div>
 
       {/* Transform Section */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Transform
+          变换
         </label>
         <div className="grid grid-cols-2 gap-2">
           <InputGroup>
@@ -294,7 +294,7 @@ export function TextProperties({ clip }: TextPropertiesProps) {
       {/* Rotation Section */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Rotation
+          旋转
         </label>
         <div className="flex items-center gap-4">
           <IconRotate className="size-4 text-muted-foreground" />
@@ -321,7 +321,7 @@ export function TextProperties({ clip }: TextPropertiesProps) {
       {/* Font Section */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Font
+          字体
         </label>
 
         <FontPicker currentFamily={currentFamily} handleFontChange={handleFontChange} />
@@ -329,12 +329,12 @@ export function TextProperties({ clip }: TextPropertiesProps) {
         <div className="grid grid-cols-2 gap-2">
           <Select value={currentFont.postScriptName} onValueChange={(v) => handleFontChange(v)}>
             <SelectTrigger className="bg-input border h-9 w-full overflow-hidden">
-              <SelectValue placeholder="Style" />
+              <SelectValue placeholder="样式" />
             </SelectTrigger>
             <SelectContent>
               {currentFamily.styles.map((style) => (
                 <SelectItem key={style.id} value={style.postScriptName}>
-                  {style.fullName.replace(currentFamily.family, "").trim() || "Regular"}
+                  {style.fullName.replace(currentFamily.family, "").trim() || "常规"}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -472,7 +472,7 @@ export function TextProperties({ clip }: TextPropertiesProps) {
       {/* Opacity Section */}
       <div className="flex flex-col gap-2">
         <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Opacity
+          不透明度
         </label>
         <div className="flex items-center gap-4">
           <IconCircle className="size-4 text-muted-foreground" />
@@ -500,7 +500,7 @@ export function TextProperties({ clip }: TextPropertiesProps) {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-            Animations
+            动画
           </label>
           <button
             onClick={() => {
@@ -519,7 +519,7 @@ export function TextProperties({ clip }: TextPropertiesProps) {
           {animations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-4 border border-dashed rounded-md bg-white/5 opacity-50">
               <IconMovie className="size-6 mb-1" />
-              <span className="text-[10px]">No animations applied</span>
+              <span className="text-[10px]">暂无动画</span>
             </div>
           ) : (
             animations.map((anim: any) => (
@@ -530,7 +530,7 @@ export function TextProperties({ clip }: TextPropertiesProps) {
                 <div className="flex flex-col flex-1">
                   <span className="text-xs font-medium capitalize">{anim.type}</span>
                   <span className="text-[10px] text-muted-foreground">
-                    {Math.round(anim.options.duration / 1e6)}s duration
+                    {Math.round(anim.options.duration / 1e6)} 秒
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
@@ -563,7 +563,7 @@ export function TextProperties({ clip }: TextPropertiesProps) {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-            Stroke
+            描边
           </label>
           <button className="text-muted-foreground hover:text-white transition-colors">
             <IconMinus className="size-3" />
@@ -633,7 +633,7 @@ export function TextProperties({ clip }: TextPropertiesProps) {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-            Shadow
+            阴影
           </label>
         </div>
 
