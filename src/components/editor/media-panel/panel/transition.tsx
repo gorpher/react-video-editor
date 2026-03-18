@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 const TRANSITION_DURATION_DEFAULT = 2_000_000;
 const TRANSITION_DURATION_MIN = 100_000;
+const TRANSITION_JOIN_TOLERANCE_US = 300_000; // 0.3s
 const MEDIA_TRANSITION_TYPES = new Set(["Video", "Image"]);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -24,6 +25,7 @@ type CustomPreset = {
 type TransitionPair = {
   fromClip: IClip;
   toClip: IClip;
+  gapUs: number;
 };
 
 const isTransitionMediaClip = (clip: IClip | null | undefined): clip is IClip => {
@@ -42,6 +44,10 @@ const computeTransitionDuration = (fromClip: IClip, toClip: IClip): number => {
   }
 
   return Math.max(TRANSITION_DURATION_MIN, minDuration * 0.25);
+};
+
+const getTransitionJoinGapUs = (fromClip: IClip, toClip: IClip) => {
+  return Math.abs((toClip.display?.from ?? 0) - (fromClip.display?.to ?? 0));
 };
 
 const resolveTransitionPairFromSelection = (
@@ -63,9 +69,15 @@ const resolveTransitionPairFromSelection = (
       return { error: "转场需要两个不同的片段。" };
     }
 
-    return first.display.from <= second.display.from
-      ? { fromClip: first, toClip: second }
-      : { fromClip: second, toClip: first };
+    const orderedPair =
+      first.display.from <= second.display.from
+        ? { fromClip: first, toClip: second }
+        : { fromClip: second, toClip: first };
+
+    return {
+      ...orderedPair,
+      gapUs: getTransitionJoinGapUs(orderedPair.fromClip, orderedPair.toClip),
+    };
   }
 
   if (mediaSelected.length > 2) {
@@ -99,18 +111,42 @@ const resolveTransitionPairFromSelection = (
     }
 
     if (prevClip && nextClip) {
-      const prevGap = Math.abs(baseClip.display.from - prevClip.display.to);
-      const nextGap = Math.abs(nextClip.display.from - baseClip.display.to);
-      return prevGap <= nextGap
-        ? { fromClip: prevClip, toClip: baseClip }
-        : { fromClip: baseClip, toClip: nextClip };
+      const candidates: TransitionPair[] = [
+        {
+          fromClip: prevClip,
+          toClip: baseClip,
+          gapUs: getTransitionJoinGapUs(prevClip, baseClip),
+        },
+        {
+          fromClip: baseClip,
+          toClip: nextClip,
+          gapUs: getTransitionJoinGapUs(baseClip, nextClip),
+        },
+      ];
+
+      candidates.sort((a, b) => {
+        const aOutOfTolerance = a.gapUs > TRANSITION_JOIN_TOLERANCE_US ? 1 : 0;
+        const bOutOfTolerance = b.gapUs > TRANSITION_JOIN_TOLERANCE_US ? 1 : 0;
+        if (aOutOfTolerance !== bOutOfTolerance) return aOutOfTolerance - bOutOfTolerance;
+        return a.gapUs - b.gapUs;
+      });
+
+      return candidates[0];
     }
 
     if (nextClip) {
-      return { fromClip: baseClip, toClip: nextClip };
+      return {
+        fromClip: baseClip,
+        toClip: nextClip,
+        gapUs: getTransitionJoinGapUs(baseClip, nextClip),
+      };
     }
 
-    return { fromClip: prevClip!, toClip: baseClip };
+    return {
+      fromClip: prevClip!,
+      toClip: baseClip,
+      gapUs: getTransitionJoinGapUs(prevClip!, baseClip),
+    };
   }
 
   return { error: "请先在时间线上选中一个或两个视频/图片片段，再添加转场。" };
@@ -140,10 +176,13 @@ const addTransitionFromSelection = async ({
     return;
   }
 
-  const { fromClip, toClip } = pairOrError;
+  const { fromClip, toClip, gapUs } = pairOrError;
   const duration = computeTransitionDuration(fromClip, toClip);
 
   try {
+    if (gapUs > TRANSITION_JOIN_TOLERANCE_US) {
+      toast(`片段间隔较大（${(gapUs / 1_000_000).toFixed(2)}s），已按最近边界添加转场。`);
+    }
     await studio.addTransition(transitionKey, duration, fromClip.id, toClip.id);
     toast.success(`已添加转场：${transitionLabel}`);
   } catch (error) {
