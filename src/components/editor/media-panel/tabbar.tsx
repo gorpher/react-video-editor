@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 
 export function TabBar() {
   const { activeTab, setActiveTab } = useMediaPanelStore();
+  const visibleTabs = Object.entries(tabs) as Array<[Tab, (typeof tabs)[keyof typeof tabs]]>;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showLeftFade, setShowLeftFade] = useState(false);
   const [showRightFade, setShowRightFade] = useState(false);
@@ -43,8 +44,7 @@ export function TabBar() {
       )}
       <div ref={scrollRef} className="overflow-x-auto scrollbar-hidden w-full">
         <div className="flex items-center gap-2 w-fit mx-auto px-4">
-          {(Object.keys(tabs) as Tab[]).map((tabKey) => {
-            const tab = tabs[tabKey];
+          {visibleTabs.map(([tabKey, tab]) => {
             const isActive = activeTab === tabKey;
             return (
               <div

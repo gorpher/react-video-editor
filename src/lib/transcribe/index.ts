@@ -1,12 +1,22 @@
-import { createClient } from "@deepgram/sdk";
 import { deepgramToCombo } from "./deepgram-to-combo";
 import type { TranscriptObject } from "./types";
 
 export interface TranscribeOptions {
   /**
-   * Audio URL to transcribe
+   * Audio URL to transcribe (publicly accessible from server side)
    */
-  url: string;
+  url?: string;
+
+  /**
+   * Raw audio/video binary data to transcribe.
+   * Useful for local blob sources that cannot be fetched by Deepgram directly.
+   */
+  audioData?: ArrayBuffer | Uint8Array;
+
+  /**
+   * MIME type for audioData.
+   */
+  mimeType?: string;
 
   /**
    * API key for Deepgram (optional, defaults to env variable)
@@ -40,8 +50,53 @@ export interface TranscribeOptions {
   words?: boolean;
 }
 
+function getDeepgramApiBaseUrl() {
+  return (process.env.DEEPGRAM_URL || "https://api.deepgram.com/v1").trim().replace(/\/+$/, "");
+}
+
+function safeParseJson(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function getDeepgramErrorMessage(payload: unknown, fallback: string) {
+  if (typeof payload === "string" && payload.trim()) {
+    return payload;
+  }
+
+  if (payload && typeof payload === "object") {
+    const record = payload as {
+      message?: unknown;
+      err_msg?: unknown;
+      error?: unknown;
+      detail?: unknown;
+    };
+
+    if (typeof record.message === "string" && record.message.trim()) {
+      return record.message;
+    }
+
+    if (typeof record.err_msg === "string" && record.err_msg.trim()) {
+      return record.err_msg;
+    }
+
+    if (typeof record.error === "string" && record.error.trim()) {
+      return record.error;
+    }
+
+    if (typeof record.detail === "string" && record.detail.trim()) {
+      return record.detail;
+    }
+  }
+
+  return fallback;
+}
+
 /**
- * Transcribe audio from a URL using Deepgram
+ * Transcribe audio using Deepgram (URL or binary data).
  *
  * @param options - Transcription options
  * @returns Parsed transcription result in Combo format
@@ -59,6 +114,8 @@ export async function transcribe(
 ): Promise<Partial<TranscriptObject> | null> {
   const {
     url,
+    audioData,
+    mimeType,
     apiKey = process.env.DEEPGRAM_API_KEY || process.env.DEPPGRAM_KEY,
     language,
     model = "nova-3",
@@ -67,42 +124,70 @@ export async function transcribe(
     words = true,
   } = options;
 
-  if (!url) {
-    throw new Error("Audio URL is required");
+  if (!url && !audioData) {
+    throw new Error("Either audio URL or audio data is required");
   }
 
   if (!apiKey) {
     throw new Error("Deepgram API key is required");
   }
 
-  // Create Deepgram client
-  const deepgram = createClient(apiKey);
+  const deepgramEndpoint = `${getDeepgramApiBaseUrl()}/listen`;
+  const query = new URLSearchParams();
+  query.set("model", model);
+  query.set("smart_format", smartFormat ? "true" : "false");
+  query.set("paragraphs", paragraphs ? "true" : "false");
+  query.set("words", words ? "true" : "false");
+  query.set("detect_language", "true");
 
-  // Build Deepgram options
-  const deepgramOptions: any = {
-    model,
-    smart_format: smartFormat,
-    paragraphs,
-    detect_language: true,
-  };
-
-  // Add language if provided
   if (language && language !== "auto") {
-    deepgramOptions.language = language;
+    query.set("language", language);
   }
 
-  // Transcribe audio
-  const { result, error } = await deepgram.listen.prerecorded.transcribeUrl(
-    { url },
-    deepgramOptions,
-  );
+  const headers = new Headers({
+    Authorization: `Token ${apiKey}`,
+  });
 
-  if (error) {
-    throw new Error(error.message || "Failed to transcribe audio");
+  let body: BodyInit;
+  if (audioData) {
+    const bytes = audioData instanceof Uint8Array ? audioData : new Uint8Array(audioData);
+    const safeBytes = Uint8Array.from(bytes);
+    const contentType = mimeType || "application/octet-stream";
+    headers.set("Content-Type", contentType);
+    body = new Blob([safeBytes.buffer], { type: contentType });
+  } else {
+    headers.set("Content-Type", "application/json");
+    body = JSON.stringify({ url });
+  }
+
+  const response = await fetch(`${deepgramEndpoint}?${query.toString()}`, {
+    method: "POST",
+    headers,
+    body,
+    cache: "no-store",
+  });
+
+  const text = await response.text();
+  const deepgramPayload = text ? safeParseJson(text) : {};
+
+  if (!response.ok) {
+    const errorMessage = getDeepgramErrorMessage(
+      deepgramPayload ?? text,
+      "Failed to transcribe audio",
+    );
+    throw new Error(errorMessage);
+  }
+
+  if (!deepgramPayload || typeof deepgramPayload !== "object") {
+    throw new Error("Deepgram returned unexpected response format");
   }
 
   // Convert Deepgram result to Combo format
-  const parsed = await deepgramToCombo(result);
+  const parsed = await deepgramToCombo(deepgramPayload);
+
+  if (!parsed) {
+    throw new Error("No transcription text was produced");
+  }
 
   return parsed;
 }

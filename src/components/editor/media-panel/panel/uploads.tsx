@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useStudioStore } from "@/stores/studio-store";
 import { useProjectStore } from "@/stores/project-store";
 import { Image, Video, Audio, Log, clipToJSON, type IClip as StudioClip } from "openvideo";
-import { Upload, Film, Search, X, HardDrive, Trash2, Music } from "lucide-react";
+import { Upload, Film, Search, X, HardDrive, Trash2, Music, Plus } from "lucide-react";
 import { storageService, type StorageStats } from "@/lib/storage/storage-service";
 import type { MediaFile, MediaType } from "@/types/media";
 import type { AifilmMediaItem } from "@/lib/aifilm-media";
@@ -108,7 +108,7 @@ function AssetCard({
   const previewSrc = asset.preview || asset.src;
 
   return (
-    <div className="flex flex-col gap-1.5 group cursor-pointer" onClick={() => onAdd(asset)}>
+    <div className="flex flex-col gap-1.5 group">
       <div className="relative aspect-square rounded-sm overflow-hidden bg-foreground/20 border border-transparent group-hover:border-primary/50 transition-all flex items-center justify-center">
         {asset.type === "image" ? (
           <img src={previewSrc} alt={asset.name} className="max-w-full max-h-full object-contain" />
@@ -138,17 +138,39 @@ function AssetCard({
           </div>
         )}
 
+        {asset.source === "aifilm" && asset.type === "video" && (
+          <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/70 text-[10px] text-white font-medium flex items-center gap-1">
+            <Film size={10} />
+            <span>视频</span>
+          </div>
+        )}
+
         {asset.source === "aifilm" && (
           <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-primary/85 text-[10px] text-primary-foreground font-medium">
             AIFilm
           </div>
         )}
 
+        <button
+          type="button"
+          className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/35 transition-colors"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAdd(asset);
+          }}
+          title="添加到轨道"
+          aria-label={`添加 ${asset.name} 到轨道`}
+        >
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-black opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all shadow">
+            <Plus size={18} />
+          </span>
+        </button>
+
         {/* Remove Button (Minimalist on Hover) */}
         {asset.source === "local" && onDelete && (
           <button
             type="button"
-            className="absolute top-1 right-1 p-1 rounded bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive"
+            className="absolute top-1 right-1 p-1 rounded bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive z-10"
             onClick={(e) => {
               e.stopPropagation();
               onDelete(asset.id);
@@ -437,29 +459,215 @@ export default function PanelUploads() {
     }
   };
 
+  type StudioTrackLike = {
+    id: string;
+    type?: string;
+    clipIds?: string[];
+  };
+
+  const getCurrentInsertTimeUs = () => {
+    const getCurrentTime = (studio as any)?.getCurrentTime;
+    if (typeof getCurrentTime === "function") {
+      const currentTimeUs = Number(getCurrentTime.call(studio));
+      if (Number.isFinite(currentTimeUs) && currentTimeUs >= 0) {
+        return currentTimeUs;
+      }
+    }
+
+    const fallbackCurrentTimeUs = Number((studio as any)?.currentTime);
+    if (Number.isFinite(fallbackCurrentTimeUs) && fallbackCurrentTimeUs >= 0) {
+      return fallbackCurrentTimeUs;
+    }
+
+    return 0;
+  };
+
+  const getStudioTracks = (): StudioTrackLike[] => {
+    const tracks = (studio as any)?.getTracks?.();
+    return Array.isArray(tracks) ? (tracks as StudioTrackLike[]) : [];
+  };
+
+  const getTrackClipRanges = (track: StudioTrackLike): Array<{ from: number; to: number }> => {
+    const clipIds = Array.isArray(track.clipIds) ? track.clipIds : [];
+    const ranges: Array<{ from: number; to: number }> = [];
+
+    for (const clipId of clipIds) {
+      if (typeof clipId !== "string") continue;
+      const clip = (studio as any)?.getClip?.(clipId) as
+        | {
+            display?: { from?: number; to?: number };
+            duration?: number;
+          }
+        | undefined;
+
+      const from = Number(clip?.display?.from);
+      const to = Number(clip?.display?.to);
+      if (Number.isFinite(from) && Number.isFinite(to) && to > from) {
+        ranges.push({ from, to });
+        continue;
+      }
+
+      const duration = Number(clip?.duration);
+      if (Number.isFinite(from) && Number.isFinite(duration) && duration > 0) {
+        ranges.push({ from, to: from + duration });
+      }
+    }
+
+    return ranges.sort((a, b) => a.from - b.from);
+  };
+
+  const isTrackTypeCompatible = (assetType: MediaType, trackType?: string) => {
+    const normalizedType = (trackType || "").toLowerCase();
+    if (assetType === "audio") {
+      return normalizedType === "audio";
+    }
+
+    return normalizedType === "video" || normalizedType === "image";
+  };
+
+  const getPreferredTrackId = (assetType: MediaType, atUs: number): string | undefined => {
+    const candidateTracks = getStudioTracks().filter((track) =>
+      isTrackTypeCompatible(assetType, track.type),
+    );
+
+    if (candidateTracks.length === 0) {
+      return undefined;
+    }
+
+    let coveringTrackId: string | undefined;
+    let coveringClipFrom = -1;
+    let nearestEndedTrackId: string | undefined;
+    let nearestEndedTo = -1;
+
+    for (const track of candidateTracks) {
+      const ranges = getTrackClipRanges(track);
+      for (const range of ranges) {
+        if (atUs >= range.from && atUs < range.to) {
+          if (range.from > coveringClipFrom) {
+            coveringClipFrom = range.from;
+            coveringTrackId = track.id;
+          }
+          continue;
+        }
+
+        if (range.to <= atUs && range.to > nearestEndedTo) {
+          nearestEndedTo = range.to;
+          nearestEndedTrackId = track.id;
+        }
+      }
+    }
+
+    return coveringTrackId || nearestEndedTrackId || candidateTracks[0]?.id;
+  };
+
+  const resolveInsertStartUs = (
+    trackId: string | undefined,
+    desiredStartUs: number,
+    durationUs: number,
+  ) => {
+    if (!trackId || durationUs <= 0) {
+      return desiredStartUs;
+    }
+
+    const track = getStudioTracks().find((item) => item.id === trackId);
+    if (!track) {
+      return desiredStartUs;
+    }
+
+    const ranges = getTrackClipRanges(track);
+    let insertStartUs = desiredStartUs;
+
+    for (const range of ranges) {
+      const insertEndUs = insertStartUs + durationUs;
+      if (range.to <= insertStartUs) {
+        continue;
+      }
+      if (range.from >= insertEndUs) {
+        break;
+      }
+      insertStartUs = Math.max(insertStartUs, range.to);
+    }
+
+    return insertStartUs;
+  };
+
+  const getClipDurationUs = (
+    clip: { display?: { from?: number; to?: number }; duration?: number },
+    fallbackDurationUs?: number,
+  ) => {
+    const from = Number(clip.display?.from);
+    const to = Number(clip.display?.to);
+    if (Number.isFinite(from) && Number.isFinite(to) && to > from) {
+      return to - from;
+    }
+
+    const duration = Number(clip.duration);
+    if (Number.isFinite(duration) && duration > 0) {
+      return duration;
+    }
+
+    if (
+      typeof fallbackDurationUs === "number" &&
+      Number.isFinite(fallbackDurationUs) &&
+      fallbackDurationUs > 0
+    ) {
+      return fallbackDurationUs;
+    }
+
+    return 0;
+  };
+
   // Add item to canvas
   const addItemToCanvas = async (asset: VisualAsset) => {
     if (!studio) return;
 
     try {
+      const baseStartUs = getCurrentInsertTimeUs();
+      const preferredTrackId = getPreferredTrackId(asset.type, baseStartUs);
+      const fallbackDurationUs =
+        typeof asset.duration === "number" && Number.isFinite(asset.duration) && asset.duration > 0
+          ? asset.duration * 1_000_000
+          : undefined;
+
       if (asset.type === "image") {
         const imageClip = await Image.fromUrl(asset.src);
         imageClip.name = asset.name;
-        imageClip.display = { from: 0, to: 5 * 1e6 };
-        imageClip.duration = 5 * 1e6;
+        const imageDurationUs = 5 * 1_000_000;
+        const imageStartUs = resolveInsertStartUs(preferredTrackId, baseStartUs, imageDurationUs);
+        imageClip.display = { from: imageStartUs, to: imageStartUs + imageDurationUs };
+        imageClip.duration = imageDurationUs;
         await imageClip.scaleToFit(canvasSize.width, canvasSize.height);
         imageClip.centerInScene(canvasSize.width, canvasSize.height);
-        await studio.addClip(imageClip);
+        await studio.addClip(
+          imageClip,
+          preferredTrackId ? { trackId: preferredTrackId } : undefined,
+        );
       } else if (asset.type === "audio") {
         const audioClip = await Audio.fromUrl(asset.src);
         audioClip.name = asset.name;
-        await studio.addClip(audioClip);
+        const audioDurationUs = getClipDurationUs(audioClip as any, fallbackDurationUs);
+        const audioStartUs = resolveInsertStartUs(preferredTrackId, baseStartUs, audioDurationUs);
+        if (audioDurationUs > 0) {
+          (audioClip as any).display = { from: audioStartUs, to: audioStartUs + audioDurationUs };
+        }
+        await studio.addClip(
+          audioClip,
+          preferredTrackId ? { trackId: preferredTrackId } : undefined,
+        );
       } else {
         const videoClip = await Video.fromUrl(asset.src);
         videoClip.name = asset.name;
+        const videoDurationUs = getClipDurationUs(videoClip as any, fallbackDurationUs);
+        const videoStartUs = resolveInsertStartUs(preferredTrackId, baseStartUs, videoDurationUs);
+        if (videoDurationUs > 0) {
+          (videoClip as any).display = { from: videoStartUs, to: videoStartUs + videoDurationUs };
+        }
         await videoClip.scaleToFit(canvasSize.width, canvasSize.height);
         videoClip.centerInScene(canvasSize.width, canvasSize.height);
-        await studio.addClip(videoClip);
+        await studio.addClip(
+          videoClip,
+          preferredTrackId ? { trackId: preferredTrackId } : undefined,
+        );
       }
     } catch (error) {
       Log.error(`Failed to add ${asset.type}:`, error);

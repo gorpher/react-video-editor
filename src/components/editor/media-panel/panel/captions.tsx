@@ -9,6 +9,7 @@ import { fontManager, jsonToClip, Log, type IClip } from "openvideo";
 import { generateCaptionClips } from "@/lib/caption-generator";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export default function PanelCaptions() {
   const { studio } = useStudioStore();
@@ -97,28 +98,66 @@ export default function PanelCaptions() {
 
       const captionTrackId = `track_captions_${Date.now()}`;
       const clipsToAdd: IClip[] = [];
+      const failedMedia: string[] = [];
 
-      for (const mediaClip of mediaItems) {
-        try {
-          // 1. Get transcription
-          const audioUrl = (mediaClip as any).src;
-          if (!audioUrl) continue;
+      const getErrorMessageFromResponse = async (response: Response) => {
+        const payload = (await response.json().catch(() => ({}))) as { message?: string };
+        if (typeof payload.message === "string" && payload.message.trim()) {
+          return payload.message;
+        }
+        return `Transcription failed (${response.status})`;
+      };
 
-          const transcribeResponse = await fetch("/api/transcribe", {
+      const transcribeMediaClip = async (mediaClip: IClip) => {
+        const audioUrl = (mediaClip as any).src as string | undefined;
+        if (!audioUrl) {
+          throw new Error("Media source URL is missing");
+        }
+
+        let transcribeResponse: Response;
+
+        if (audioUrl.startsWith("blob:")) {
+          const localMediaResponse = await fetch(audioUrl);
+          if (!localMediaResponse.ok) {
+            throw new Error(`Failed to read local media source (${localMediaResponse.status})`);
+          }
+
+          const blob = await localMediaResponse.blob();
+          const fileName = `${(mediaClip as any).name || mediaClip.id || "media"}.bin`;
+          const formData = new FormData();
+          formData.append("file", blob, fileName);
+          formData.append("model", "nova-3");
+
+          transcribeResponse = await fetch("/api/transcribe", {
+            method: "POST",
+            body: formData,
+          });
+        } else {
+          transcribeResponse = await fetch("/api/transcribe", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ url: audioUrl, model: "nova-3" }),
           });
+        }
 
-          if (!transcribeResponse.ok) {
-            Log.error(`Transcription failed for media ${mediaClip.id}`);
-            continue;
-          }
+        if (!transcribeResponse.ok) {
+          throw new Error(await getErrorMessageFromResponse(transcribeResponse));
+        }
 
-          const transcriptionData = await transcribeResponse.json();
+        return transcribeResponse.json();
+      };
+
+      for (const mediaClip of mediaItems) {
+        try {
+          // 1. Get transcription
+          const transcriptionData = await transcribeMediaClip(mediaClip);
           if (!transcriptionData) continue;
 
           const words = transcriptionData.results?.main?.words || transcriptionData.words || [];
+          if (!Array.isArray(words) || words.length === 0) {
+            failedMedia.push(`${(mediaClip as any).name || mediaClip.id}: no words detected`);
+            continue;
+          }
 
           // 2. Generate caption JSON
           const captionClipsJSON = await generateCaptionClips({
@@ -145,6 +184,8 @@ export default function PanelCaptions() {
             clipsToAdd.push(clip);
           }
         } catch (error) {
+          const message = error instanceof Error ? error.message : "Unknown transcription error";
+          failedMedia.push(`${(mediaClip as any).name || mediaClip.id}: ${message}`);
           Log.error(`Failed to process media ${mediaClip.id}:`, error);
         }
       }
@@ -152,9 +193,20 @@ export default function PanelCaptions() {
       if (clipsToAdd.length > 0) {
         await studio.addClip(clipsToAdd, { trackId: captionTrackId });
         updateClips();
+        toast.success(`Generated ${clipsToAdd.length} caption clip(s).`);
+      } else {
+        toast.error("No captions were generated.");
+      }
+
+      if (failedMedia.length > 0) {
+        const summary = failedMedia.slice(0, 2).join(" | ");
+        const suffix = failedMedia.length > 2 ? ` (+${failedMedia.length - 2} more)` : "";
+        toast.error(`Some media failed to transcribe: ${summary}${suffix}`);
       }
     } catch (error) {
       Log.error("Failed to generate captions:", error);
+      const message = error instanceof Error ? error.message : "Failed to generate captions";
+      toast.error(message);
     } finally {
       setIsGenerating(false);
     }

@@ -1,5 +1,6 @@
 param(
   [string]$OutputDir,
+  [string]$NodeBaseImage = 'node:20-bookworm-slim',
   [switch]$SkipBuild,
   [switch]$Zip
 )
@@ -127,8 +128,31 @@ $webImageOffline = 'openvideo-editor-web:offline'
 
 if (-not $SkipBuild) {
   Write-Host '[OfflinePack] Building web image...' -ForegroundColor Cyan
+
+  if (-not (Test-DockerImageExists -Image $NodeBaseImage)) {
+    Write-Host "[OfflinePack] Base image not found locally, trying to pull: $NodeBaseImage" -ForegroundColor DarkCyan
+    try {
+      Invoke-External -FilePath 'docker' -Arguments @('pull', $NodeBaseImage)
+    } catch {
+      throw @"
+[OfflinePack] Failed to pull base image: $NodeBaseImage
+This is usually a Docker registry/mirror network issue.
+
+You can fix it with either option:
+1) Change Docker registry mirror and retry
+2) Preload a reachable base image and pass it explicitly:
+   npm run offline:pack -- -NodeBaseImage <your-local-or-reachable-image>
+
+Original error:
+$($_.Exception.Message)
+"@
+    }
+  }
+
   Invoke-External -FilePath 'docker' -Arguments @(
     'build',
+    '--pull=false',
+    '--build-arg', "NODE_BASE_IMAGE=$NodeBaseImage",
     '-t', $webImageSource,
     '-f', 'Dockerfile',
     '.'
