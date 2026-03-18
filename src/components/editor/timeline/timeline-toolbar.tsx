@@ -1,4 +1,6 @@
+import { useEffect, useRef, useState } from "react";
 import { usePlaybackStore } from "@/stores/playback-store";
+import { useStudioStore } from "@/stores/studio-store";
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,11 +15,14 @@ import {
   ArrowLeftToLine,
   ArrowRightToLine,
   Scissors,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { DEFAULT_FPS } from "@/stores/project-store";
 import { formatTimeCode } from "@/lib/time";
 import { EditableTimecode } from "@/components/ui/editable-timecode";
+import { toast } from "sonner";
 
 import {
   IconPlayerPauseFilled,
@@ -40,6 +45,110 @@ export function TimelineToolbar({
   onSplit?: () => void;
 }) {
   const { currentTime, duration, isPlaying, toggle, seek } = usePlaybackStore();
+  const { studio } = useStudioStore();
+  const [isOriginalAudioMuted, setIsOriginalAudioMuted] = useState(false);
+  const [isTogglingOriginalAudio, setIsTogglingOriginalAudio] = useState(false);
+  const originalVolumeByClipIdRef = useRef<Map<string, number>>(new Map());
+
+  const getVideoClips = () => {
+    const studioClips = (((studio as any)?.clips || []) as any[]).filter(
+      (clip) => clip?.type === "Video" && typeof clip?.id === "string",
+    );
+
+    return studioClips.map((clip) => {
+      const rawVolume = Number(clip.volume);
+      return {
+        id: clip.id as string,
+        volume: Number.isFinite(rawVolume) ? rawVolume : 1,
+      };
+    });
+  };
+
+  const applyVideoVolumeUpdates = async (
+    updates: Array<{ id: string; updates: { volume: number } }>,
+  ) => {
+    if (!studio || updates.length === 0) return;
+
+    const batchUpdate = (studio as any).updateClips;
+    if (typeof batchUpdate === "function") {
+      await batchUpdate.call(studio, updates);
+      return;
+    }
+
+    const singleUpdate = (studio as any).updateClip;
+    if (typeof singleUpdate === "function") {
+      for (const update of updates) {
+        await singleUpdate.call(studio, update.id, update.updates);
+      }
+    }
+  };
+
+  const handleToggleOriginalAudio = async () => {
+    if (!studio || isTogglingOriginalAudio) return;
+
+    const videoClips = getVideoClips();
+    if (videoClips.length === 0) {
+      toast.info("时间线上还没有视频片段。");
+      return;
+    }
+
+    setIsTogglingOriginalAudio(true);
+    try {
+      if (!isOriginalAudioMuted) {
+        const updates = videoClips.map((clip) => {
+          originalVolumeByClipIdRef.current.set(clip.id, clip.volume);
+          return { id: clip.id, updates: { volume: 0 } };
+        });
+
+        await applyVideoVolumeUpdates(updates);
+        setIsOriginalAudioMuted(true);
+        toast.success("已关闭视频原声。");
+      } else {
+        const updates = videoClips.map((clip) => ({
+          id: clip.id,
+          updates: { volume: originalVolumeByClipIdRef.current.get(clip.id) ?? 1 },
+        }));
+
+        await applyVideoVolumeUpdates(updates);
+        originalVolumeByClipIdRef.current.clear();
+        setIsOriginalAudioMuted(false);
+        toast.success("已恢复视频原声。");
+      }
+    } catch (error) {
+      console.error("Failed to toggle original video audio:", error);
+      toast.error("切换原声失败，请重试。");
+    } finally {
+      setIsTogglingOriginalAudio(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!studio || !isOriginalAudioMuted) return;
+
+    const handleClipsAdded = async ({ clips }: { clips?: any[] }) => {
+      const addedVideoClips = (clips || [])
+        .filter((clip: any) => clip?.type === "Video" && typeof clip?.id === "string")
+        .map((clip: any) => {
+          const rawVolume = Number(clip.volume);
+          const volume = Number.isFinite(rawVolume) ? rawVolume : 1;
+          originalVolumeByClipIdRef.current.set(clip.id, volume);
+          return { id: clip.id as string, updates: { volume: 0 } };
+        });
+
+      if (addedVideoClips.length === 0) return;
+
+      try {
+        await applyVideoVolumeUpdates(addedVideoClips);
+      } catch (error) {
+        console.error("Failed to auto-mute newly added video clips:", error);
+      }
+    };
+
+    studio.on("clips:added", handleClipsAdded);
+    return () => {
+      studio.off("clips:added", handleClipsAdded);
+    };
+  }, [studio, isOriginalAudioMuted]);
 
   const handleZoomIn = () => {
     setZoomLevel(Math.min(3.5, zoomLevel + 0.15));
@@ -90,6 +199,24 @@ export function TimelineToolbar({
               </Button>
             </TooltipTrigger>
             <TooltipContent>自动吸附</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => void handleToggleOriginalAudio()}
+                disabled={!studio || isTogglingOriginalAudio}
+              >
+                {isOriginalAudioMuted ? (
+                  <VolumeX className="h-4 w-4" />
+                ) : (
+                  <Volume2 className="h-4 w-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{isOriginalAudioMuted ? "恢复原声" : "关闭原声"}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
       </div>

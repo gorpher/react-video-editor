@@ -11,6 +11,7 @@ import {
   Video,
   Search,
   Trash2,
+  Pencil,
   MoreHorizontal,
   X,
   PlusIcon,
@@ -24,10 +25,11 @@ import { Input } from "@/components/ui/input";
 interface ProjectCardProps {
   project: TProject;
   onOpen: (id: string) => void;
+  onRename: (e: React.MouseEvent, id: string) => void;
   onDelete: (e: React.MouseEvent, id: string) => void;
 }
 
-function ProjectCard({ project, onOpen, onDelete }: ProjectCardProps) {
+function ProjectCard({ project, onOpen, onRename, onDelete }: ProjectCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -88,6 +90,16 @@ function ProjectCard({ project, onOpen, onDelete }: ProjectCardProps) {
                 <button
                   onClick={(e) => {
                     setMenuOpen(false);
+                    onRename(e, project.id);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-muted/60 transition-colors"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  {"\u91cd\u547d\u540d"}
+                </button>
+                <button
+                  onClick={(e) => {
+                    setMenuOpen(false);
                     onDelete(e, project.id);
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2.5 text-destructive hover:bg-destructive/10 active:bg-destructive/20 transition-colors"
@@ -137,10 +149,17 @@ export default function ProjectsPage() {
   };
 
   const handleCreateProject = async () => {
+    const inputName = window.prompt(
+      "\u8bf7\u8f93\u5165\u9879\u76ee\u540d\u79f0",
+      "\u672a\u547d\u540d\u9879\u76ee",
+    );
+    if (inputName === null) return;
+    const projectName = inputName.trim() || "\u672a\u547d\u540d\u9879\u76ee";
+
     const sceneId = generateUUID();
     const newProject: TProject = {
       id: generateUUID(),
-      name: "未命名项目",
+      name: projectName,
       thumbnail: "",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -165,6 +184,34 @@ export default function ProjectsPage() {
       await loadProjects();
     } catch (error) {
       console.error("Failed to delete project", error);
+    }
+  };
+
+  const handleRenameProject = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const target = projects.find((p) => p.id === id);
+    if (!target) return;
+
+    const inputName = window.prompt(
+      "\u91cd\u547d\u540d\u9879\u76ee",
+      target.name || "\u672a\u547d\u540d\u9879\u76ee",
+    );
+    if (inputName === null) return;
+
+    const nextName = inputName.trim() || "\u672a\u547d\u540d\u9879\u76ee";
+    if (nextName === target.name) return;
+
+    try {
+      await storageService.saveProject({
+        project: {
+          ...target,
+          name: nextName,
+          updatedAt: new Date(),
+        },
+      });
+      await loadProjects();
+    } catch (error) {
+      console.error("Failed to rename project", error);
     }
   };
 
@@ -314,6 +361,7 @@ export default function ProjectsPage() {
                 key={project.id}
                 project={project}
                 onOpen={(id) => router.push(`/edit/${id}`)}
+                onRename={handleRenameProject}
                 onDelete={handleDeleteProject}
               />
             ))}

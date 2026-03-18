@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { IconShare } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,6 @@ import {
 import { toast } from "sonner";
 import { Compositor } from "openvideo";
 import { ShortcutsModal } from "./shortcuts-modal";
-import { useEffect } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,6 +49,9 @@ export default function Header() {
   const params = useParams();
   const projectId = params.projectId as string;
   const [isSaving, setIsSaving] = useState(false);
+  const [projectName, setProjectName] = useState("\u672a\u547d\u540d\u9879\u76ee");
+  const [nameDraft, setNameDraft] = useState("\u672a\u547d\u540d\u9879\u76ee");
+  const [isEditingName, setIsEditingName] = useState(false);
 
   const handleApplyCustomSize = () => {
     const w = parseInt(customWidth);
@@ -179,10 +181,37 @@ export default function Header() {
     };
   }, [studio]);
 
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+
+    const loadProjectName = async () => {
+      try {
+        const project = await storageService.loadProject({ id: projectId });
+        const loadedName = project?.name?.trim() || "\u672a\u547d\u540d\u9879\u76ee";
+
+        if (!cancelled) {
+          setProjectName(loadedName);
+          setNameDraft(loadedName);
+        }
+      } catch (error) {
+        console.error("Failed to load project name", error);
+      }
+    };
+
+    void loadProjectName();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
   const handleSave = async (showToast = true) => {
     if (!studio || !projectId) return;
 
-    setIsSaving(true);
+    if (showToast) {
+      setIsSaving(true);
+    }
     let toastId;
     if (showToast) {
       toastId = toast.loading("保存中...");
@@ -200,8 +229,72 @@ export default function Header() {
         toast.error("保存失败", { id: toastId });
       }
     } finally {
-      setIsSaving(false);
+      if (showToast) {
+        setIsSaving(false);
+      }
     }
+  };
+  const persistProjectName = async (rawName: string, showSuccessToast = true) => {
+    if (!projectId) return false;
+
+    const nextName = rawName.trim();
+    if (!nextName) {
+      toast.error("\u9879\u76ee\u540d\u79f0\u4e0d\u80fd\u4e3a\u7a7a");
+      setNameDraft(projectName);
+      return false;
+    }
+
+    if (nextName === projectName) {
+      setNameDraft(nextName);
+      return true;
+    }
+
+    try {
+      const existing = await storageService.loadProject({ id: projectId });
+      if (!existing) {
+        toast.error("\u672a\u627e\u5230\u9879\u76ee");
+        return false;
+      }
+
+      const latestData = studio?.exportToJSON() ?? existing.data;
+      await storageService.saveProject({
+        project: {
+          ...existing,
+          name: nextName,
+          data: latestData,
+          updatedAt: new Date(),
+        },
+      });
+
+      setProjectName(nextName);
+      setNameDraft(nextName);
+      if (showSuccessToast) {
+        toast.success("\u5df2\u66f4\u65b0\u9879\u76ee\u540d\u79f0");
+      }
+      return true;
+    } catch (error) {
+      console.error("Failed to rename project", error);
+      toast.error("\u9879\u76ee\u91cd\u547d\u540d\u5931\u8d25");
+      return false;
+    }
+  };
+
+  const handleRenameProject = async () => {
+    const renamed = await persistProjectName(nameDraft);
+    if (renamed) {
+      setIsEditingName(false);
+    }
+  };
+  const handleManualSave = async () => {
+    if (!studio || !projectId) return;
+
+    if (isEditingName) {
+      const renamed = await persistProjectName(nameDraft, false);
+      if (!renamed) return;
+      setIsEditingName(false);
+    }
+
+    await handleSave(true);
   };
   // Auto-save on studio changes (with debounce)
   useEffect(() => {
@@ -482,8 +575,38 @@ export default function Header() {
       </div>
 
       {/* Center Section */}
-      <div className="absolute text-sm font-medium left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-        未命名视频
+      <div className="pointer-events-auto absolute left-1/2 top-1/2 w-[320px] max-w-[40vw] -translate-x-1/2 -translate-y-1/2">
+        {isEditingName ? (
+          <input
+            autoFocus
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onBlur={() => void handleRenameProject()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void handleRenameProject();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                setNameDraft(projectName);
+                setIsEditingName(false);
+              }
+            }}
+            className="h-8 w-full rounded-md border border-border bg-background px-2 text-center text-sm font-medium outline-none ring-0 focus-visible:border-primary"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setNameDraft(projectName);
+              setIsEditingName(true);
+            }}
+            className="w-full truncate rounded-md px-2 py-1 text-center text-sm font-medium hover:bg-muted/60"
+            title="点击重命名项目"
+          >
+            {projectName || "未命名项目"}
+          </button>
+        )}
       </div>
 
       {/* Right Section */}
@@ -518,6 +641,17 @@ export default function Header() {
         <ShortcutsModal open={isShortcutsModalOpen} onOpenChange={setIsShortcutsModalOpen} />
 
         <ModeToggle />
+
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-2"
+          onClick={() => void handleManualSave()}
+          disabled={!studio || !projectId || isSaving}
+        >
+          <Save className="size-4" />
+          {isSaving ? "\u4fdd\u5b58\u4e2d" : "\u4fdd\u5b58"}
+        </Button>
 
         <Button size="sm" className="gap-2 rounded-full" onClick={() => setIsExportModalOpen(true)}>
           导出
