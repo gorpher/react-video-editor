@@ -44,6 +44,7 @@ import color from "color";
 import { NumberInput } from "@/components/ui/number-input";
 import { Switch } from "@/components/ui/switch";
 import useLayoutStore from "../store/use-layout-store";
+import { getAnimationTypeLabel } from "../constant/animation-localization";
 
 interface VideoPropertiesProps {
   clip: IClip;
@@ -313,7 +314,7 @@ export function VideoProperties({ clip }: VideoPropertiesProps) {
                 className="flex items-center justify-between p-2 bg-secondary/30 rounded-md group"
               >
                 <div className="flex flex-col flex-1">
-                  <span className="text-xs font-medium capitalize">{anim.type}</span>
+                  <span className="text-xs font-medium">{getAnimationTypeLabel(anim.type)}</span>
                   <span className="text-[10px] text-muted-foreground">
                     {Math.round(anim.options.duration / 1e6)} 秒
                   </span>

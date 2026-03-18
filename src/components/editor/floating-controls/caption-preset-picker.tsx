@@ -172,7 +172,7 @@ const CaptionPresetPicker = () => {
       className="absolute left-full top-0 z-200 ml-2 w-72 border bg-background p-0"
     >
       <div className="handle flex  items-center justify-between px-4 py-3 pb-0">
-        <p className="text-sm font-bold">Presets</p>
+        <p className="text-sm font-bold">预设</p>
         <div className="h-4 w-4" onClick={() => setFloatingControl("")}>
           <XIcon className="h-3 w-3 cursor-pointer font-extrabold text-muted-foreground" />
         </div>

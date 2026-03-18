@@ -22,6 +22,7 @@ import useLayoutStore from "../store/use-layout-store";
 import { useStudioStore } from "@/stores/studio-store";
 import { useRef } from "react";
 import { Switch } from "@/components/ui/switch";
+import { getAnimatablePropertyLabel } from "../constant/animation-localization";
 
 type PropertyKey = keyof typeof ANIMATABLE_PROPERTIES;
 
@@ -312,54 +313,54 @@ export function AnimationPropertiesPicker() {
   const isTextLike = typeClip === "Text" || typeClip === "Caption";
 
   const inPresets = [
-    { label: "Fade In", value: "fadeIn" },
-    { label: "Zoom In", value: "zoomIn" },
-    { label: "Slide In", value: "slideIn" },
-    { label: "Blur In", value: "blurIn" },
-    { label: "Pulse", value: "pulse" },
+    { label: "淡入", value: "fadeIn" },
+    { label: "放大进入", value: "zoomIn" },
+    { label: "滑入", value: "slideIn" },
+    { label: "模糊进入", value: "blurIn" },
+    { label: "脉冲", value: "pulse" },
     ...(isTextLike
       ? [
-          { label: "Pop", value: "popCaption" },
-          { label: "Bounce", value: "bounceCaption" },
-          { label: "Scale", value: "scaleCaption" },
-          { label: "Slide Left", value: "slideLeftCaption" },
-          { label: "Slide Right", value: "slideRightCaption" },
-          { label: "Slide Up", value: "slideUpCaption" },
-          { label: "Slide Down", value: "slideDownCaption" },
-          { label: "Slide Fade By Word", value: "slideFadeByWord" },
-          { label: "Up Down", value: "upDownCaption" },
-          { label: "Up Left", value: "upLeftCaption" },
-          { label: "Char Fade In", value: "charFadeIn" },
-          { label: "Char Slide Up", value: "charSlideUp" },
-          { label: "Char Typewriter", value: "charTypewriter" },
-          { label: "Fade By Word", value: "fadeByWord" },
-          { label: "Pop By Word", value: "popByWord" },
-          { label: "Scale Fade By Word", value: "scaleFadeByWord" },
-          { label: "Bounce By Word", value: "bounceByWord" },
-          { label: "Rotate In By Word", value: "rotateInByWord" },
-          { label: "Slide Right By Word", value: "slideRightByWord" },
-          { label: "Slide Left By Word", value: "slideLeftByWord" },
-          { label: "Fade Rotate By Word", value: "fadeRotateByWord" },
-          { label: "Skew By Word", value: "skewByWord" },
-          { label: "Wave By Word", value: "waveByWord" },
-          { label: "Blur In By Word", value: "blurInByWord" },
-          { label: "Drop Soft By Word", value: "dropSoftByWord" },
-          { label: "Elastic Pop By Word", value: "elasticPopByWord" },
-          { label: "Flip Up By Word", value: "flipUpByWord" },
-          { label: "Spin In By Word", value: "spinInByWord" },
-          { label: "Stretch In By Word", value: "stretchInByWord" },
-          { label: "Reveal Zoom By Word", value: "revealZoomByWord" },
-          { label: "Float Wave By Word", value: "floatWaveByWord" },
+          { label: "弹入", value: "popCaption" },
+          { label: "弹跳", value: "bounceCaption" },
+          { label: "缩放", value: "scaleCaption" },
+          { label: "左滑入", value: "slideLeftCaption" },
+          { label: "右滑入", value: "slideRightCaption" },
+          { label: "上滑入", value: "slideUpCaption" },
+          { label: "下滑入", value: "slideDownCaption" },
+          { label: "按词滑入淡化", value: "slideFadeByWord" },
+          { label: "上下进入", value: "upDownCaption" },
+          { label: "左上进入", value: "upLeftCaption" },
+          { label: "逐字淡入", value: "charFadeIn" },
+          { label: "逐字上滑", value: "charSlideUp" },
+          { label: "逐字打字机", value: "charTypewriter" },
+          { label: "按词淡入", value: "fadeByWord" },
+          { label: "按词弹入", value: "popByWord" },
+          { label: "按词缩放淡入", value: "scaleFadeByWord" },
+          { label: "按词弹跳", value: "bounceByWord" },
+          { label: "按词旋转进入", value: "rotateInByWord" },
+          { label: "按词右滑", value: "slideRightByWord" },
+          { label: "按词左滑", value: "slideLeftByWord" },
+          { label: "按词淡入旋转", value: "fadeRotateByWord" },
+          { label: "按词倾斜", value: "skewByWord" },
+          { label: "按词波浪", value: "waveByWord" },
+          { label: "按词模糊进入", value: "blurInByWord" },
+          { label: "按词柔和下落", value: "dropSoftByWord" },
+          { label: "按词弹性弹入", value: "elasticPopByWord" },
+          { label: "按词上翻", value: "flipUpByWord" },
+          { label: "按词旋转进入", value: "spinInByWord" },
+          { label: "按词拉伸进入", value: "stretchInByWord" },
+          { label: "按词缩放显现", value: "revealZoomByWord" },
+          { label: "按词漂浮波浪", value: "floatWaveByWord" },
         ]
       : []),
   ];
 
   const outPresets = [
-    { label: "Fade Out", value: "fadeOut" },
-    { label: "Zoom Out", value: "zoomOut" },
-    { label: "Slide Out", value: "slideOut" },
-    { label: "Blur Out", value: "blurOut" },
-    { label: "Pulse", value: "pulse" },
+    { label: "淡出", value: "fadeOut" },
+    { label: "缩小退出", value: "zoomOut" },
+    { label: "滑出", value: "slideOut" },
+    { label: "模糊退出", value: "blurOut" },
+    { label: "脉冲", value: "pulse" },
   ];
 
   return (
@@ -371,9 +372,7 @@ export function AnimationPropertiesPicker() {
         <div className="flex flex-col gap-4 p-4">
           {/* Header */}
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold">
-              {mode === "add" ? "Add Animation" : "Edit Animation"}
-            </h3>
+            <h3 className="text-sm font-semibold">{mode === "add" ? "添加动画" : "编辑动画"}</h3>
             <button
               onClick={() => setFloatingControl("")}
               className="text-muted-foreground hover:text-white"
@@ -398,9 +397,9 @@ export function AnimationPropertiesPicker() {
           ) : (
             <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="in">In</TabsTrigger>
-                <TabsTrigger value="out">Out</TabsTrigger>
-                <TabsTrigger value="custom">Custom</TabsTrigger>
+                <TabsTrigger value="in">入场</TabsTrigger>
+                <TabsTrigger value="out">出场</TabsTrigger>
+                <TabsTrigger value="custom">自定义</TabsTrigger>
               </TabsList>
 
               <div className="mt-4 flex flex-col gap-4">
@@ -417,7 +416,7 @@ export function AnimationPropertiesPicker() {
                 {(preset === "slideIn" || preset === "slideOut") && (
                   <div className="grid grid-cols-2 gap-2 p-2 bg-secondary/20 rounded-md">
                     <div className="flex flex-col gap-1">
-                      <label className="text-[10px] text-muted-foreground">Direction</label>
+                      <label className="text-[10px] text-muted-foreground">方向</label>
                       <Select
                         value={presetParams.direction}
                         onValueChange={(val) =>
@@ -431,15 +430,15 @@ export function AnimationPropertiesPicker() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="z-[250]">
-                          <SelectItem value="left">Left</SelectItem>
-                          <SelectItem value="right">Right</SelectItem>
-                          <SelectItem value="top">Top</SelectItem>
-                          <SelectItem value="bottom">Bottom</SelectItem>
+                          <SelectItem value="left">左</SelectItem>
+                          <SelectItem value="right">右</SelectItem>
+                          <SelectItem value="top">上</SelectItem>
+                          <SelectItem value="bottom">下</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className="text-[10px] text-muted-foreground">Distance (px)</label>
+                      <label className="text-[10px] text-muted-foreground">距离 (px)</label>
                       <NumberInput
                         value={presetParams.distance}
                         onChange={(val) =>
@@ -459,7 +458,7 @@ export function AnimationPropertiesPicker() {
                   <div className="flex flex-col gap-2 p-2 bg-secondary/20 rounded-md">
                     <div className="flex items-center justify-between">
                       <label className="text-[10px] text-muted-foreground">
-                        Stagger: {presetParams.stagger}s
+                        字符间隔: {presetParams.stagger}s
                       </label>
                     </div>
                     <Slider
@@ -480,7 +479,7 @@ export function AnimationPropertiesPicker() {
                 {/* Keyframes */}
                 <div className="flex flex-col gap-2">
                   <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                    Keyframes
+                    关键帧
                   </label>
 
                   {sortedKeyframes.map((keyframe) => (
@@ -504,7 +503,7 @@ export function AnimationPropertiesPicker() {
                     className="w-full"
                   >
                     <IconPlus className="size-3.5 mr-1" />
-                    Add Keyframe
+                    添加关键帧
                   </Button>
                 </div>
 
@@ -512,10 +511,8 @@ export function AnimationPropertiesPicker() {
                 {typeClip !== "Text" && (
                   <div className="flex items-center justify-between p-2 bg-secondary/20 rounded-md border border-dashed">
                     <div className="flex flex-col gap-0.5">
-                      <span className="text-xs font-medium">Mirror Effect</span>
-                      <span className="text-[10px] text-muted-foreground">
-                        Repeat edges to fill frame
-                      </span>
+                      <span className="text-xs font-medium">镜像填充</span>
+                      <span className="text-[10px] text-muted-foreground">重复边缘以填满画面</span>
                     </div>
                     <Switch checked={mirrorEnabled} onCheckedChange={setMirrorEnabled} />
                   </div>
@@ -524,14 +521,12 @@ export function AnimationPropertiesPicker() {
                 {/* Timing */}
                 <div className="flex flex-col gap-2">
                   <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                    Timing
+                    时序
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     <InputGroup>
                       <InputGroupAddon align="inline-start">
-                        <span className="text-[10px] font-medium text-muted-foreground">
-                          Duration
-                        </span>
+                        <span className="text-[10px] font-medium text-muted-foreground">时长</span>
                       </InputGroupAddon>
                       <NumberInput value={duration} onChange={setDuration} className="p-0" />
                       <InputGroupAddon align="inline-end">
@@ -543,7 +538,7 @@ export function AnimationPropertiesPicker() {
                       className={cn(activeTab !== "custom" && "opacity-60 pointer-events-none")}
                     >
                       <InputGroupAddon align="inline-start">
-                        <span className="text-[10px] font-medium text-muted-foreground">Delay</span>
+                        <span className="text-[10px] font-medium text-muted-foreground">延迟</span>
                       </InputGroupAddon>
                       <NumberInput value={delay} onChange={setDelay} className="p-0" />
                       <InputGroupAddon align="inline-end">
@@ -554,14 +549,14 @@ export function AnimationPropertiesPicker() {
 
                   {activeTab === "out" && (
                     <div className="text-[10px] text-muted-foreground italic px-1">
-                      * Delay matches clip end automatically
+                      * 延迟会自动对齐片段结尾
                     </div>
                   )}
 
                   <InputGroup>
                     <InputGroupAddon align="inline-start">
                       <span className="text-[10px] font-medium text-muted-foreground">
-                        Iterations
+                        循环次数
                       </span>
                     </InputGroupAddon>
                     <NumberInput value={iterCount} onChange={setIterCount} className="p-0" />
@@ -578,13 +573,13 @@ export function AnimationPropertiesPicker() {
           <div className="flex flex-col gap-2 pt-2 border-t mt-4">
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setFloatingControl("")} className="flex-1">
-                Cancel
+                取消
               </Button>
               <Button
                 onClick={typeClip === "Caption" ? handleApplyToAllCaptions : handleSave}
                 className="flex-1"
               >
-                {mode === "add" ? "Add" : "Save"}
+                {mode === "add" ? "添加" : "保存"}
               </Button>
             </div>
           </div>
@@ -624,8 +619,7 @@ function KeyframeItem({
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-muted-foreground">
-            {Object.keys(properties).length}{" "}
-            {Object.keys(properties).length === 1 ? "property" : "properties"}
+            {Object.keys(properties).length} 项属性
           </span>
           {canRemove && (
             <button
@@ -657,7 +651,7 @@ function KeyframeItem({
                   />
 
                   <span className="text-[10px] text-muted-foreground min-w-[60px]">
-                    {config.label}
+                    {getAnimatablePropertyLabel(prop, config.label)}
                   </span>
                   {isEnabled && (
                     <div className="flex-1 flex items-center gap-2">
@@ -695,23 +689,23 @@ const EasingOptions = ({
   return (
     <div className="flex flex-col gap-2">
       <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-        Easing
+        缓动
       </label>
       <Select value={easing} onValueChange={setEasing}>
         <SelectTrigger className="w-full h-9">
-          <SelectValue placeholder="Select easing" />
+          <SelectValue placeholder="选择缓动" />
         </SelectTrigger>
         <SelectContent className="z-[250]">
-          <SelectItem value="linear">Linear</SelectItem>
-          <SelectItem value="slow">Slow</SelectItem>
-          <SelectItem value="easeInQuad">Ease In Quad</SelectItem>
-          <SelectItem value="easeOutQuad">Ease Out Quad</SelectItem>
-          <SelectItem value="easeInOutQuad">Ease In Out Quad</SelectItem>
-          <SelectItem value="easeInCubic">Ease In Cubic</SelectItem>
-          <SelectItem value="easeOutCubic">Ease Out Cubic</SelectItem>
-          <SelectItem value="easeInOutCubic">Ease In Out Cubic</SelectItem>
-          <SelectItem value="easeInBack">Ease In Back</SelectItem>
-          <SelectItem value="easeOutBack">Ease Out Back</SelectItem>
+          <SelectItem value="linear">线性</SelectItem>
+          <SelectItem value="slow">慢速</SelectItem>
+          <SelectItem value="easeInQuad">二次缓入</SelectItem>
+          <SelectItem value="easeOutQuad">二次缓出</SelectItem>
+          <SelectItem value="easeInOutQuad">二次缓入缓出</SelectItem>
+          <SelectItem value="easeInCubic">三次缓入</SelectItem>
+          <SelectItem value="easeOutCubic">三次缓出</SelectItem>
+          <SelectItem value="easeInOutCubic">三次缓入缓出</SelectItem>
+          <SelectItem value="easeInBack">回弹缓入</SelectItem>
+          <SelectItem value="easeOutBack">回弹缓出</SelectItem>
         </SelectContent>
       </Select>
     </div>
@@ -734,11 +728,11 @@ const PresetOptions = ({
   return (
     <div className="flex flex-col gap-2">
       <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-        Preset
+        预设
       </label>
       <Select value={preset} onValueChange={handlePresetChange}>
         <SelectTrigger className="w-full h-9">
-          <SelectValue placeholder="Select a preset" />
+          <SelectValue placeholder="选择预设" />
         </SelectTrigger>
         <SelectContent className="z-[250] max-h-60">
           {activeTab === "in" &&
@@ -755,7 +749,7 @@ const PresetOptions = ({
             ))}
           {activeTab === "custom" && (
             <>
-              <SelectItem value="custom">Keyframes Only</SelectItem>
+              <SelectItem value="custom">仅关键帧</SelectItem>
               {Array.from(
                 new Map([...inPresets, ...outPresets].map((p) => [p.value, p])).values(),
               ).map((p) => (
