@@ -33,35 +33,35 @@ export type MediaTabConfig = {
 export const tabs = {
   uploads: {
     icon: IconFolder,
-    label: "绱犳潗",
+    label: "素材",
   },
   images: {
     icon: IconPhoto,
-    label: "鍥剧墖",
+    label: "图片",
   },
   videos: {
     icon: IconVideo,
-    label: "瑙嗛",
+    label: "视频",
   },
   text: {
     icon: IconLetterT,
-    label: "鏂囧瓧",
+    label: "文字",
   },
   music: {
     icon: IconMusic,
-    label: "闊充箰",
+    label: "音乐",
   },
   voiceovers: {
     icon: IconMicrophone,
-    label: "閰嶉煶",
+    label: "配音",
   },
   sfx: {
     icon: IconWaveSine,
-    label: "闊虫晥",
+    label: "音效",
   },
   transitions: {
     icon: IconArrowsLeftRight,
-    label: "杞満",
+    label: "转场",
   },
   // captions/effects/elements are intentionally hidden for now.
 } satisfies Partial<Record<Tab, MediaTabConfig>>;

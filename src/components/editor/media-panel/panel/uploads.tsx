@@ -487,9 +487,11 @@ export default function PanelUploads() {
     return Array.isArray(tracks) ? (tracks as StudioTrackLike[]) : [];
   };
 
-  const getTrackClipRanges = (track: StudioTrackLike): Array<{ from: number; to: number }> => {
+  const getTrackClipInfos = (
+    track: StudioTrackLike,
+  ): Array<{ id: string; from: number; to: number }> => {
     const clipIds = Array.isArray(track.clipIds) ? track.clipIds : [];
-    const ranges: Array<{ from: number; to: number }> = [];
+    const clips: Array<{ id: string; from: number; to: number }> = [];
 
     for (const clipId of clipIds) {
       if (typeof clipId !== "string") continue;
@@ -503,17 +505,21 @@ export default function PanelUploads() {
       const from = Number(clip?.display?.from);
       const to = Number(clip?.display?.to);
       if (Number.isFinite(from) && Number.isFinite(to) && to > from) {
-        ranges.push({ from, to });
+        clips.push({ id: clipId, from, to });
         continue;
       }
 
       const duration = Number(clip?.duration);
       if (Number.isFinite(from) && Number.isFinite(duration) && duration > 0) {
-        ranges.push({ from, to: from + duration });
+        clips.push({ id: clipId, from, to: from + duration });
       }
     }
 
-    return ranges.sort((a, b) => a.from - b.from);
+    return clips.sort((a, b) => a.from - b.from);
+  };
+
+  const getTrackClipRanges = (track: StudioTrackLike): Array<{ from: number; to: number }> => {
+    return getTrackClipInfos(track).map((clip) => ({ from: clip.from, to: clip.to }));
   };
 
   const isTrackTypeCompatible = (assetType: MediaType, trackType?: string) => {
@@ -560,12 +566,8 @@ export default function PanelUploads() {
     return coveringTrackId || nearestEndedTrackId || candidateTracks[0]?.id;
   };
 
-  const resolveInsertStartUs = (
-    trackId: string | undefined,
-    desiredStartUs: number,
-    durationUs: number,
-  ) => {
-    if (!trackId || durationUs <= 0) {
+  const resolveInsertAnchorUs = (trackId: string | undefined, desiredStartUs: number) => {
+    if (!trackId) {
       return desiredStartUs;
     }
 
@@ -575,20 +577,49 @@ export default function PanelUploads() {
     }
 
     const ranges = getTrackClipRanges(track);
-    let insertStartUs = desiredStartUs;
-
     for (const range of ranges) {
-      const insertEndUs = insertStartUs + durationUs;
-      if (range.to <= insertStartUs) {
-        continue;
+      if (desiredStartUs > range.from && desiredStartUs < range.to) {
+        // Keep insertion at a clean boundary when playhead is inside an existing clip.
+        return range.to;
       }
-      if (range.from >= insertEndUs) {
-        break;
-      }
-      insertStartUs = Math.max(insertStartUs, range.to);
     }
 
-    return insertStartUs;
+    return desiredStartUs;
+  };
+
+  const rippleShiftTrackClips = async (
+    trackId: string | undefined,
+    insertStartUs: number,
+    deltaUs: number,
+  ) => {
+    if (!trackId || deltaUs <= 0) return;
+
+    const track = getStudioTracks().find((item) => item.id === trackId);
+    if (!track) return;
+
+    const clipsToShift = getTrackClipInfos(track).filter((clip) => clip.from >= insertStartUs);
+    if (clipsToShift.length === 0) return;
+
+    const shiftedUpdates = clipsToShift
+      .sort((a, b) => b.from - a.from)
+      .map((clip) => ({
+        id: clip.id,
+        updates: {
+          display: {
+            from: clip.from + deltaUs,
+            to: clip.to + deltaUs,
+          },
+        },
+      }));
+
+    if (typeof (studio as any).updateClips === "function") {
+      await (studio as any).updateClips(shiftedUpdates);
+      return;
+    }
+
+    for (const update of shiftedUpdates) {
+      await (studio as any).updateClip(update.id, update.updates);
+    }
   };
 
   const getClipDurationUs = (
@@ -624,6 +655,7 @@ export default function PanelUploads() {
     try {
       const baseStartUs = getCurrentInsertTimeUs();
       const preferredTrackId = getPreferredTrackId(asset.type, baseStartUs);
+      const insertStartUs = resolveInsertAnchorUs(preferredTrackId, baseStartUs);
       const fallbackDurationUs =
         typeof asset.duration === "number" && Number.isFinite(asset.duration) && asset.duration > 0
           ? asset.duration * 1_000_000
@@ -633,8 +665,8 @@ export default function PanelUploads() {
         const imageClip = await Image.fromUrl(asset.src);
         imageClip.name = asset.name;
         const imageDurationUs = 5 * 1_000_000;
-        const imageStartUs = resolveInsertStartUs(preferredTrackId, baseStartUs, imageDurationUs);
-        imageClip.display = { from: imageStartUs, to: imageStartUs + imageDurationUs };
+        await rippleShiftTrackClips(preferredTrackId, insertStartUs, imageDurationUs);
+        imageClip.display = { from: insertStartUs, to: insertStartUs + imageDurationUs };
         imageClip.duration = imageDurationUs;
         await imageClip.scaleToFit(canvasSize.width, canvasSize.height);
         imageClip.centerInScene(canvasSize.width, canvasSize.height);
@@ -646,9 +678,9 @@ export default function PanelUploads() {
         const audioClip = await Audio.fromUrl(asset.src);
         audioClip.name = asset.name;
         const audioDurationUs = getClipDurationUs(audioClip as any, fallbackDurationUs);
-        const audioStartUs = resolveInsertStartUs(preferredTrackId, baseStartUs, audioDurationUs);
+        await rippleShiftTrackClips(preferredTrackId, insertStartUs, audioDurationUs);
         if (audioDurationUs > 0) {
-          (audioClip as any).display = { from: audioStartUs, to: audioStartUs + audioDurationUs };
+          (audioClip as any).display = { from: insertStartUs, to: insertStartUs + audioDurationUs };
         }
         await studio.addClip(
           audioClip,
@@ -658,9 +690,9 @@ export default function PanelUploads() {
         const videoClip = await Video.fromUrl(asset.src);
         videoClip.name = asset.name;
         const videoDurationUs = getClipDurationUs(videoClip as any, fallbackDurationUs);
-        const videoStartUs = resolveInsertStartUs(preferredTrackId, baseStartUs, videoDurationUs);
+        await rippleShiftTrackClips(preferredTrackId, insertStartUs, videoDurationUs);
         if (videoDurationUs > 0) {
-          (videoClip as any).display = { from: videoStartUs, to: videoStartUs + videoDurationUs };
+          (videoClip as any).display = { from: insertStartUs, to: insertStartUs + videoDurationUs };
         }
         await videoClip.scaleToFit(canvasSize.width, canvasSize.height);
         videoClip.centerInScene(canvasSize.width, canvasSize.height);

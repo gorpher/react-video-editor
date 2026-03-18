@@ -34,10 +34,9 @@ const viewMap: Record<Tab, React.ReactNode> = {
 };
 
 export function MediaPanel() {
-  const { activeTab } = useMediaPanelStore();
+  const { activeTab, showProperties, setShowProperties } = useMediaPanelStore();
   const [selectedClips, setSelectedClips] = useState<IClip[]>([]);
   const { studio, setSelectedClips: setStudioSelectedClips } = useStudioStore();
-  const [showProperties, setShowProperties] = useState(false);
 
   useEffect(() => {
     if (!studio) return;
@@ -63,12 +62,6 @@ export function MediaPanel() {
       studio.off("selection:cleared", handleClear);
     };
   }, [studio]);
-
-  useEffect(() => {
-    if (activeTab) {
-      setShowProperties(false);
-    }
-  }, [activeTab]);
 
   return (
     <div className="h-full flex flex-col bg-card rounded-sm overflow-hidden w-full">
