@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useStudioStore } from "@/stores/studio-store";
 import { useProjectStore } from "@/stores/project-store";
 import { Video, Log } from "openvideo";
-import { Search, Film, Upload, Trash2, Music } from "lucide-react";
+import { Search, Film, Upload, Trash2, Plus } from "lucide-react";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Button } from "@/components/ui/button";
 import { storageService } from "@/lib/storage/storage-service";
@@ -147,11 +147,7 @@ export default function PanelVideos() {
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-x-3 gap-y-4">
             {filtered.map((asset) => (
-              <div
-                key={asset.id}
-                className="flex flex-col gap-1.5 group cursor-pointer"
-                onClick={() => addItemToCanvas(asset)}
-              >
+              <div key={asset.id} className="flex flex-col gap-1.5 group">
                 <div className="relative aspect-square rounded-sm overflow-hidden bg-foreground/20 border border-transparent group-hover:border-primary/50 transition-all flex items-center justify-center bg-black/40">
                   <video
                     src={asset.src}
@@ -170,7 +166,17 @@ export default function PanelVideos() {
                   )}
                   <button
                     type="button"
-                    className="absolute top-1 right-1 p-1 rounded bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive"
+                    aria-label="Add video to canvas"
+                    className="absolute inset-0 z-10 flex items-center justify-center bg-black/0 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:bg-black/35 group-hover:pointer-events-auto transition-all"
+                    onClick={() => addItemToCanvas(asset)}
+                  >
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-black shadow-md">
+                      <Plus size={16} />
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="absolute top-1 right-1 z-20 p-1 rounded bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDelete(asset.id);
