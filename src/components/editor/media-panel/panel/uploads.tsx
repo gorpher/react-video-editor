@@ -6,12 +6,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useStudioStore } from "@/stores/studio-store";
 import { useProjectStore } from "@/stores/project-store";
 import { Image, Video, Audio, Log, clipToJSON, type IClip as StudioClip } from "openvideo";
-import { Upload, Film, Search, X, HardDrive, Trash2, Music, Plus } from "lucide-react";
+import { Upload, Search, X, HardDrive, Trash2, Music, Plus } from "lucide-react";
 import { storageService, type StorageStats } from "@/lib/storage/storage-service";
 import type { MediaFile, MediaType } from "@/types/media";
 import type { AifilmMediaItem } from "@/lib/aifilm-media";
 import { uploadFile } from "@/lib/upload-utils";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { useParams } from "next/navigation";
 interface VisualAsset {
   id: string;
   type: MediaType;
@@ -27,6 +28,23 @@ interface VisualAsset {
 
 const STORAGE_KEY = "designcombo_uploads";
 const PROJECT_ID = "local-uploads";
+type AssetFilter = "all" | "video" | "image" | "audio" | "other";
+
+const UI_LABELS = {
+  all: String.fromCharCode(0x5168, 0x90e8),
+  video: String.fromCharCode(0x89c6, 0x9891),
+  image: String.fromCharCode(0x56fe, 0x7247),
+  audio: String.fromCharCode(0x97f3, 0x4e50),
+  other: String.fromCharCode(0x5176, 0x4ed6),
+};
+
+const ASSET_FILTER_OPTIONS: Array<{ key: AssetFilter; label: string }> = [
+  { key: "all", label: UI_LABELS.all },
+  { key: "video", label: UI_LABELS.video },
+  { key: "image", label: UI_LABELS.image },
+  { key: "audio", label: UI_LABELS.audio },
+  { key: "other", label: UI_LABELS.other },
+];
 
 // Detect file type from MIME type and extension
 function detectFileType(file: File): MediaType {
@@ -95,6 +113,40 @@ function mapAifilmMediaToAsset(item: AifilmMediaItem): VisualAsset | null {
   };
 }
 
+function getAssetFilterKey(asset: VisualAsset): AssetFilter {
+  if (asset.type === "video") return "video";
+  if (asset.type === "image") return "image";
+  if (asset.type === "audio") return "audio";
+  return "other";
+}
+
+function getAssetTypeBadge(type: MediaType | string) {
+  if (type === "video") {
+    return {
+      label: UI_LABELS.video,
+      className: "bg-red-500/95 text-white border-red-300/60",
+    };
+  }
+
+  if (type === "image") {
+    return {
+      label: UI_LABELS.image,
+      className: "bg-blue-500/95 text-white border-blue-300/60",
+    };
+  }
+
+  if (type === "audio") {
+    return {
+      label: UI_LABELS.audio,
+      className: "bg-emerald-500/95 text-white border-emerald-300/60",
+    };
+  }
+
+  return {
+    label: UI_LABELS.other,
+    className: "bg-zinc-500/95 text-white border-zinc-300/60",
+  };
+}
 // Asset card component
 function AssetCard({
   asset,
@@ -106,6 +158,7 @@ function AssetCard({
   onDelete?: (id: string) => void;
 }) {
   const previewSrc = asset.preview || asset.src;
+  const typeBadge = getAssetTypeBadge(asset.type);
 
   return (
     <div className="flex flex-col gap-1.5 group">
@@ -138,18 +191,17 @@ function AssetCard({
           </div>
         )}
 
-        {asset.source === "aifilm" && asset.type === "video" && (
-          <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/70 text-[10px] text-white font-medium flex items-center gap-1">
-            <Film size={10} />
-            <span>视频</span>
-          </div>
-        )}
-
         {asset.source === "aifilm" && (
           <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-primary/85 text-[10px] text-primary-foreground font-medium">
             AIFilm
           </div>
         )}
+
+        <div
+          className={`absolute top-1.5 right-1.5 px-2 py-0.5 rounded-md border text-[11px] font-semibold tracking-wide shadow-sm ${typeBadge.className}`}
+        >
+          {typeBadge.label}
+        </div>
 
         <button
           type="button"
@@ -158,8 +210,8 @@ function AssetCard({
             e.stopPropagation();
             onAdd(asset);
           }}
-          title="添加到轨道"
-          aria-label={`添加 ${asset.name} 到轨道`}
+          title={String.fromCharCode(0x6dfb, 0x52a0, 0x5230, 0x8f68, 0x9053)}
+          aria-label={`${String.fromCharCode(0x6dfb, 0x52a0)} ${asset.name} ${String.fromCharCode(0x5230, 0x8f68, 0x9053)}`}
         >
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-black opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all shadow">
             <Plus size={18} />
@@ -170,7 +222,7 @@ function AssetCard({
         {asset.source === "local" && onDelete && (
           <button
             type="button"
-            className="absolute top-1 right-1 p-1 rounded bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive z-10"
+            className="absolute top-1 left-1 p-1 rounded bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive z-10"
             onClick={(e) => {
               e.stopPropagation();
               onDelete(asset.id);
@@ -192,6 +244,7 @@ function AssetCard({
 export default function PanelUploads() {
   const { studio } = useStudioStore();
   const { canvasSize } = useProjectStore();
+  const params = useParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [uploads, setUploads] = useState<VisualAsset[]>([]);
   const [remoteAssets, setRemoteAssets] = useState<VisualAsset[]>([]);
@@ -200,7 +253,14 @@ export default function PanelUploads() {
   const [remoteError, setRemoteError] = useState<string | null>(null);
   const [storageStats, setStorageStats] = useState<StorageStats | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [assetFilter, setAssetFilter] = useState<AssetFilter>("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const routeProjectId = useMemo(() => {
+    const value = params?.projectId;
+    if (typeof value === "string") return value.trim();
+    if (Array.isArray(value)) return (value[0] || "").trim();
+    return "";
+  }, [params]);
 
   // Load storage stats
   const loadStorageStats = useCallback(async () => {
@@ -208,57 +268,68 @@ export default function PanelUploads() {
     setStorageStats(stats);
   }, []);
 
-  const loadAifilmAssets = useCallback(async (signal?: AbortSignal) => {
-    setIsRemoteLoading(true);
+  const loadAifilmAssets = useCallback(
+    async (signal?: AbortSignal) => {
+      setIsRemoteLoading(true);
 
-    try {
-      const response = await fetch("/api/aifilm/media", {
-        cache: "no-store",
-        signal,
-      });
-      const payload = (await response.json().catch(() => ({}))) as {
-        items?: AifilmMediaItem[];
-        error?: string;
-        unavailable?: boolean;
-      };
+      try {
+        const query = new URLSearchParams();
+        if (routeProjectId) {
+          query.set("projectId", routeProjectId);
+        }
+        const endpoint =
+          query.size > 0 ? `/api/aifilm/media?${query.toString()}` : "/api/aifilm/media";
 
-      if (!response.ok) {
-        console.warn("[AIFilmMedia] Uploads panel list request unavailable", {
-          status: response.status,
-          message: payload.error || "Failed to load AIFilm media.",
+        const response = await fetch(endpoint, {
+          cache: "no-store",
+          signal,
         });
+        const payload = (await response.json().catch(() => ({}))) as {
+          items?: AifilmMediaItem[];
+          error?: string;
+          unavailable?: boolean;
+        };
+
+        if (!response.ok) {
+          console.warn("[AIFilmMedia] Uploads panel list request unavailable", {
+            status: response.status,
+            message: payload.error || "Failed to load AIFilm media.",
+          });
+          setRemoteAssets([]);
+          setRemoteError(payload.error || "AIFilm media is unavailable right now.");
+          return;
+        }
+
+        const assets = (payload.items || [])
+          .map(mapAifilmMediaToAsset)
+          .filter((asset): asset is VisualAsset => Boolean(asset));
+
+        console.info("[AIFilmMedia] Loaded uploads panel assets", {
+          count: assets.length,
+          projectId: routeProjectId || "all",
+        });
+        setRemoteAssets(assets);
+        if (payload.unavailable) {
+          setRemoteError(payload.error || "AIFilm media is unavailable right now.");
+        } else {
+          setRemoteError(null);
+        }
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
+        console.warn("[AIFilmMedia] Failed to load uploads panel assets", error);
         setRemoteAssets([]);
-        setRemoteError(payload.error || "AIFilm media is unavailable right now.");
-        return;
+        setRemoteError(error instanceof Error ? error.message : "Failed to load AIFilm media.");
+      } finally {
+        if (!signal?.aborted) {
+          setIsRemoteLoading(false);
+        }
       }
-
-      const assets = (payload.items || [])
-        .map(mapAifilmMediaToAsset)
-        .filter((asset): asset is VisualAsset => Boolean(asset));
-
-      console.info("[AIFilmMedia] Loaded uploads panel assets", {
-        count: assets.length,
-      });
-      setRemoteAssets(assets);
-      if (payload.unavailable) {
-        setRemoteError(payload.error || "AIFilm media is unavailable right now.");
-      } else {
-        setRemoteError(null);
-      }
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return;
-      }
-
-      console.warn("[AIFilmMedia] Failed to load uploads panel assets", error);
-      setRemoteAssets([]);
-      setRemoteError(error instanceof Error ? error.message : "Failed to load AIFilm media.");
-    } finally {
-      if (!signal?.aborted) {
-        setIsRemoteLoading(false);
-      }
-    }
-  }, []);
+    },
+    [routeProjectId],
+  );
 
   // Recover uploads from OPFS on mount
   useEffect(() => {
@@ -707,18 +778,37 @@ export default function PanelUploads() {
   };
 
   const mergedAssets = useMemo(() => [...remoteAssets, ...uploads], [remoteAssets, uploads]);
+  const assetCounts = useMemo(() => {
+    const counts: Record<AssetFilter, number> = {
+      all: mergedAssets.length,
+      video: 0,
+      image: 0,
+      audio: 0,
+      other: 0,
+    };
 
-  // Filter assets by search query
-  const filteredAssets = useMemo(
-    () =>
-      mergedAssets.filter((asset) => asset.name.toLowerCase().includes(searchQuery.toLowerCase())),
-    [mergedAssets, searchQuery],
-  );
+    for (const asset of mergedAssets) {
+      const key = getAssetFilterKey(asset);
+      counts[key] += 1;
+    }
+
+    return counts;
+  }, [mergedAssets]);
+
+  // Filter assets by search query and type
+  const filteredAssets = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    return mergedAssets.filter((asset) => {
+      const matchName = asset.name.toLowerCase().includes(normalizedQuery);
+      const matchType = assetFilter === "all" ? true : getAssetFilterKey(asset) === assetFilter;
+      return matchName && matchType;
+    });
+  }, [mergedAssets, searchQuery, assetFilter]);
 
   if (!isLoaded) {
     return (
       <div className="h-full flex items-center justify-center">
-        <span className="text-sm text-muted-foreground">加载中...</span>
+        <span className="text-sm text-muted-foreground">Loading...</span>
       </div>
     );
   }
@@ -743,7 +833,7 @@ export default function PanelUploads() {
               </InputGroupAddon>
 
               <InputGroupInput
-                placeholder="搜索素材..."
+                placeholder="Search assets..."
                 className="bg-secondary/30 border-0 h-full text-xs box-border pl-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -757,6 +847,28 @@ export default function PanelUploads() {
               <Upload size={14} />
             </Button>
           </div>
+          <div className="px-4 pb-2">
+            <div className="flex items-center gap-1 overflow-x-auto scrollbar-hidden">
+              {ASSET_FILTER_OPTIONS.map((filter) => {
+                const isActive = assetFilter === filter.key;
+                return (
+                  <button
+                    key={filter.key}
+                    type="button"
+                    onClick={() => setAssetFilter(filter.key)}
+                    className={`h-6 shrink-0 rounded-full border px-2.5 text-[11px] transition-colors ${
+                      isActive
+                        ? "border-primary bg-primary/25 text-primary-foreground"
+                        : "border-border/60 bg-background/50 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <span>{filter.label}</span>
+                    <span className="ml-1.5 opacity-80">{assetCounts[filter.key]}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       ) : (
         <div>
@@ -767,19 +879,19 @@ export default function PanelUploads() {
               variant={"outline"}
               className="w-full"
             >
-              <Upload size={14} /> 上传
+              <Upload size={14} /> Upload
             </Button>
           </div>
         </div>
       )}
 
       {isRemoteLoading && (
-        <div className="px-4 pb-2 text-[11px] text-muted-foreground">正在加载 AIFilm 素材库...</div>
+        <div className="px-4 pb-2 text-[11px] text-muted-foreground">Loading AIFilm library...</div>
       )}
 
       {remoteError && (
         <div className="px-4 pb-2 text-[11px] text-amber-600 dark:text-amber-400">
-          AIFilm 素材库不可用：{remoteError}
+          AIFilm library unavailable: {remoteError}
         </div>
       )}
 
@@ -789,7 +901,7 @@ export default function PanelUploads() {
           <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2">
             <Upload size={32} className="opacity-50" />
             <span className="text-sm">
-              {mergedAssets.length === 0 ? "暂无素材" : "未找到匹配素材"}
+              {mergedAssets.length === 0 ? "No assets yet" : "No matching assets found"}
             </span>
           </div>
         ) : (

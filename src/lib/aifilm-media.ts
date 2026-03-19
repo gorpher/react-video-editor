@@ -39,14 +39,33 @@ export function buildAifilmApiUrl(pathname: string, search = "") {
 export function buildAifilmRequestHeaders(requestHeaders: Headers, extraHeaders?: HeadersInit) {
   const headers = new Headers(extraHeaders);
   const cookieHeader = requestHeaders.get("cookie");
+  const incomingDevActor = requestHeaders.get("x-dev-actor");
+  const incomingDevUserId = requestHeaders.get("x-dev-user-id");
+  const devActor =
+    process.env.AIFILM_DEV_ACTOR ??
+    process.env.NEXT_PUBLIC_AIFILM_DEV_ACTOR ??
+    process.env.AIFILM_DEV_USER_ID ??
+    process.env.NEXT_PUBLIC_AIFILM_DEV_USER_ID;
   const devUserId = process.env.AIFILM_DEV_USER_ID ?? process.env.NEXT_PUBLIC_AIFILM_DEV_USER_ID;
 
   if (cookieHeader) {
     headers.set("cookie", cookieHeader);
   }
 
+  if (incomingDevActor?.trim()) {
+    headers.set("x-dev-actor", incomingDevActor.trim());
+  }
+
+  if (incomingDevUserId?.trim()) {
+    headers.set("x-dev-user-id", incomingDevUserId.trim());
+  }
+
+  if (!headers.has("x-dev-actor") && devActor?.trim()) {
+    headers.set("x-dev-actor", devActor.trim());
+  }
+
   if (devUserId?.trim()) {
-    headers.set("x-dev-user-id", devUserId.trim());
+    headers.set("x-dev-user-id", headers.get("x-dev-user-id") || devUserId.trim());
   }
 
   return headers;

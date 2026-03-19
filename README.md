@@ -83,13 +83,15 @@ An advanced, AI-powered video editor that leverages **WebCodecs API** for high-p
 
     ```env
     AIFILM_API_BASE_URL="http://localhost:3000"
+    AIFILM_DEV_ACTOR="dev-actor"
     AIFILM_DEV_USER_ID="dev-user"
     ```
 
     - `AIFILM_API_BASE_URL`: Required. Points to the AIFilm backend base URL.
+    - `AIFILM_DEV_ACTOR`: Optional. Useful in development when the AIFilm backend accepts the `x-dev-actor` fallback.
     - `AIFILM_DEV_USER_ID`: Optional. Useful in development when you do not already have a valid AIFilm session cookie and the backend allows the `x-dev-user-id` fallback.
     - The editor uses a same-origin Next API proxy for AIFilm media, so the AIFilm address should stay in environment variables instead of being hardcoded in the client.
-    - If you already have a valid AIFilm login session available to the proxy, you can leave `AIFILM_DEV_USER_ID` empty.
+    - If you already have a valid AIFilm login session available to the proxy, you can leave `AIFILM_DEV_ACTOR` and `AIFILM_DEV_USER_ID` empty.
 
 4.  Run the development server:
 
