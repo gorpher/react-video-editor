@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
+const DEFAULT_PROJECT_NAME = "\u672a\u547d\u540d\u9879\u76ee";
+
 // ─── Project Card ────────────────────────────────────────────────────────────
 
 interface ProjectCardProps {
@@ -131,9 +133,61 @@ export default function ProjectsPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const router = useRouter();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const handledExternalProjectIdRef = useRef<string | null>(null);
+
+  const createProjectDraft = ({ id, name }: { id: string; name: string }): TProject => {
+    const sceneId = generateUUID();
+    return {
+      id,
+      name,
+      thumbnail: "",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      currentSceneId: sceneId,
+      canvasSize: { width: 1080, height: 1920 },
+      canvasMode: "preset",
+      fps: 30,
+      data: null, // Scene data will be saved on first edit
+    };
+  };
+
+  const handleExternalOpenOrCreate = async (
+    externalProjectId: string,
+    externalName?: string | null,
+  ) => {
+    const projectId = externalProjectId.trim();
+    if (!projectId) return;
+
+    setIsLoading(true);
+    try {
+      const existingProject = await storageService.loadProject({ id: projectId });
+      if (existingProject) {
+        router.replace(`/edit/${encodeURIComponent(existingProject.id)}`);
+        return;
+      }
+
+      const projectName = (externalName || "").trim() || DEFAULT_PROJECT_NAME;
+      const newProject = createProjectDraft({ id: projectId, name: projectName });
+      await storageService.saveProject({ project: newProject });
+      router.replace(`/edit/${encodeURIComponent(newProject.id)}`);
+    } catch (error) {
+      console.error("Failed to open/create project from external link", error);
+      await loadProjects();
+    }
+  };
 
   useEffect(() => {
-    loadProjects();
+    const params = new URLSearchParams(window.location.search);
+    const externalProjectId = params.get("projectId")?.trim() || params.get("id")?.trim() || "";
+
+    if (!externalProjectId) {
+      void loadProjects();
+      return;
+    }
+
+    if (handledExternalProjectIdRef.current === externalProjectId) return;
+    handledExternalProjectIdRef.current = externalProjectId;
+    void handleExternalOpenOrCreate(externalProjectId, params.get("name"));
   }, []);
 
   const loadProjects = async () => {
@@ -151,27 +205,14 @@ export default function ProjectsPage() {
   const handleCreateProject = async () => {
     const inputName = window.prompt(
       "\u8bf7\u8f93\u5165\u9879\u76ee\u540d\u79f0",
-      "\u672a\u547d\u540d\u9879\u76ee",
+      DEFAULT_PROJECT_NAME,
     );
     if (inputName === null) return;
-    const projectName = inputName.trim() || "\u672a\u547d\u540d\u9879\u76ee";
-
-    const sceneId = generateUUID();
-    const newProject: TProject = {
-      id: generateUUID(),
-      name: projectName,
-      thumbnail: "",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      currentSceneId: sceneId,
-      canvasSize: { width: 1080, height: 1920 },
-      canvasMode: "preset",
-      fps: 30,
-      data: null, // Scene data will be saved on first edit
-    };
+    const projectName = inputName.trim() || DEFAULT_PROJECT_NAME;
+    const newProject = createProjectDraft({ id: generateUUID(), name: projectName });
     try {
       await storageService.saveProject({ project: newProject });
-      router.push(`/edit/${newProject.id}`);
+      router.push(`/edit/${encodeURIComponent(newProject.id)}`);
     } catch (e) {
       console.error("Failed to create project", e);
     }
@@ -194,11 +235,11 @@ export default function ProjectsPage() {
 
     const inputName = window.prompt(
       "\u91cd\u547d\u540d\u9879\u76ee",
-      target.name || "\u672a\u547d\u540d\u9879\u76ee",
+      target.name || DEFAULT_PROJECT_NAME,
     );
     if (inputName === null) return;
 
-    const nextName = inputName.trim() || "\u672a\u547d\u540d\u9879\u76ee";
+    const nextName = inputName.trim() || DEFAULT_PROJECT_NAME;
     if (nextName === target.name) return;
 
     try {
@@ -360,7 +401,7 @@ export default function ProjectsPage() {
               <ProjectCard
                 key={project.id}
                 project={project}
-                onOpen={(id) => router.push(`/edit/${id}`)}
+                onOpen={(id) => router.push(`/edit/${encodeURIComponent(id)}`)}
                 onRename={handleRenameProject}
                 onDelete={handleDeleteProject}
               />

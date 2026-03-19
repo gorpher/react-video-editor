@@ -215,3 +215,88 @@
 - 不破坏编辑器主流程（项目 -> 编辑 -> 保存）
 - 不破坏同源代理和环境变量配置原则
 - 不轻易改动认证/存储/导出这类跨模块基础能力
+## 14. 2026-03-18 迭代复盘（汉化 / 转场 / 音轨 / 插入）
+
+### 14.1 本轮完成内容（可交付）
+- 完成媒体面板核心汉化（素材/图片/视频/文字/音乐/配音/音效/转场），并保留隐藏标签（captions/effects/elements）的可扩展能力。
+- 转场从“入口存在但难以生效”调整为“可按选择上下文稳定添加”，并加入片段衔接容差。
+- 修复音乐面板上传按钮无响应、音频分割后导出失败两类高频问题。
+- 素材卡片交互升级：AIFilm 视频脚标、悬浮 `+` 直接上轨、按分割线插入并顺延后续片段（ripple）。
+- 补齐实用功能：轨道工具栏“关闭原声/恢复原声”、Elements 形状可正常创建。
+- 保存/命名策略纠偏：命名放在项目管理和项目标题重命名，不在“保存动作”中强制命名。
+
+### 14.2 界面汉化与构建稳定性
+落点：`src/components/editor/media-panel/store.ts`
+
+- 标签配置改为 `satisfies Partial<Record<Tab, MediaTabConfig>>`，解决“隐藏 tabs 导致 TS 构建报缺字段”问题。
+- 面板文案已切到中文，后续如继续放开 captions/effects/elements，只需补齐 tabs 配置并保持类型一致。
+- 维护建议：避免用非 UTF-8 流程改中文文案，Windows 终端乱码通常是控制台编码问题，不等于文件损坏。
+
+### 14.3 转场修正（从摆设到可用）
+落点：`src/components/editor/media-panel/panel/transition.tsx`
+
+- 支持“选中 2 段”或“选中 1 段自动找相邻片段”两种添加方式。
+- 仅允许同轨道视频/图片做转场，避免跨轨误加。
+- 增加容差常量 `TRANSITION_JOIN_TOLERANCE_US = 300_000`（0.3s）。
+- 当间隔偏大时给出提示，但仍按最近边界尝试添加，提升容错体验。
+
+### 14.4 音乐轨道与导出修复
+落点：
+- `src/components/editor/media-panel/panel/music.tsx`
+- `src/components/editor/export-modal.tsx`
+
+- 音乐上传按钮：通过隐藏 input + `fileInputRef.current?.click()` 明确打通触发链路。
+- 仅接收 `audio/*`，并保持本地/上传 URL 双路径兼容。
+- 导出前增加 `repairClipSourcesForExport`：
+  - 检测并修复失效 `blob:` 源；
+  - 通过本地素材池（按 `id/name`）回填可读 URL；
+  - 无法修复时明确抛错，避免“无提示失败”。
+
+### 14.5 视频插入与素材面板交互修正
+落点：`src/components/editor/media-panel/panel/uploads.tsx`
+
+- 素材卡片新增：
+  - AIFilm 来源标记；
+  - AIFilm 视频“视频”脚标；
+  - 悬浮 `+` 一键上轨（弱化“必须点缩略图本体”的学习成本）。
+- 插入策略升级（参考 PR/剪映体验）：
+  - 取分割线时间 `getCurrentInsertTimeUs()`；
+  - 优先命中兼容轨道 `getPreferredTrackId()`；
+  - 若分割线落在片段中间，锚点对齐到该片段尾 `resolveInsertAnchorUs()`；
+  - 对同轨后续片段执行顺延 `rippleShiftTrackClips()`，实现“插入并整体后推”。
+
+### 14.6 相关补强
+- Elements 形状修复（`src/components/editor/media-panel/panel/elements.tsx`）：改为 Canvas 生成 PNG dataURL，再 `Image.fromUrl`，规避 `The source image could not be decoded`。
+- 关闭原声（`src/components/editor/timeline/timeline-toolbar.tsx`）：
+  - 功能位置在轨道工具栏；
+  - 对视频片段批量写 `volume=0`；
+  - 开启静音期间新增视频自动跟随静音（监听 `clips:added`）。
+- 面板切换一致性（`src/components/editor/media-panel/store.ts`）：`setActiveTab` 同步 `showProperties=false`，避免“点素材无反应”的状态卡住。
+
+### 14.7 保存机制与命名机制（产品策略）
+落点：
+- `src/app/projects/page.tsx`
+- `src/components/editor/header.tsx`
+
+- 保留编辑器自动保存（防丢失），并保留手工保存按钮（可控落盘）。
+- 命名责任回归项目管理：
+  - 新建项目时可输入名称；
+  - 项目列表支持重命名。
+- 编辑页顶部标题支持即时重命名，但“保存”动作不再承担“首次命名”职责，避免交互冲突。
+
+### 14.8 离线打包与部署经验
+落点：`docker-compose.offline.yml`
+
+- PostgreSQL 已保持容器内网通信，不再映射宿主 `5432`，避免端口冲突和不必要暴露。
+- 打包阶段常见失败（Docker Desktop 未启动、镜像源 EOF、`@swc/helpers` 缺失）属于环境依赖问题，不是本轮业务改动引入。
+- 交付原则：打包机需先能完整 `npm/pnpm build` + `docker build`，再执行离线 bundle 封装。
+
+### 14.9 给后续二开的技巧清单
+1. 时间线所有排布优先使用“微秒”统一单位，避免秒/us 混用造成错位。
+2. 做“插入并顺延”时，先按 `from` 倒序更新后续片段，防止更新覆盖。
+3. 与轨道相关的新增能力，优先做“轨道类型兼容判断”，再做插入，减少异常轨道创建。
+4. 导出链路不要信任 `blob:` 的长期可读性，导出前做可读性检查与源修复。
+5. 媒体面板状态改动要同时考虑 `activeTab / showProperties / selectedClips` 三者联动。
+6. AIFilm 素材访问应继续走 `/api/aifilm/*` 代理，避免前端直连破坏鉴权、同源与离线交付一致性。
+7. UI 文案改动前先确认文件编码与终端编码，避免“显示乱码”被误判为“文件损坏”。
+8. 离线发包前固定做一轮构建自检（前端 build、镜像 build、compose 配置核对），比部署后排障成本低很多。
