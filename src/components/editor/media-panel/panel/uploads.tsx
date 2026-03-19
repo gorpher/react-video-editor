@@ -124,27 +124,27 @@ function getAssetTypeBadge(type: MediaType | string) {
   if (type === "video") {
     return {
       label: UI_LABELS.video,
-      className: "bg-red-500/95 text-white border-red-300/60",
+      dotClass: "bg-rose-300",
     };
   }
 
   if (type === "image") {
     return {
       label: UI_LABELS.image,
-      className: "bg-blue-500/95 text-white border-blue-300/60",
+      dotClass: "bg-sky-300",
     };
   }
 
   if (type === "audio") {
     return {
       label: UI_LABELS.audio,
-      className: "bg-emerald-500/95 text-white border-emerald-300/60",
+      dotClass: "bg-emerald-300",
     };
   }
 
   return {
     label: UI_LABELS.other,
-    className: "bg-zinc-500/95 text-white border-zinc-300/60",
+    dotClass: "bg-zinc-300",
   };
 }
 // Asset card component
@@ -197,10 +197,9 @@ function AssetCard({
           </div>
         )}
 
-        <div
-          className={`absolute top-1.5 right-1.5 px-2 py-0.5 rounded-md border text-[11px] font-semibold tracking-wide shadow-sm ${typeBadge.className}`}
-        >
-          {typeBadge.label}
+        <div className="absolute bottom-1.5 right-1.5 inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/55 px-2 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
+          <span className={`h-1.5 w-1.5 rounded-full ${typeBadge.dotClass}`} />
+          <span className="leading-none">{typeBadge.label}</span>
         </div>
 
         <button
@@ -858,8 +857,8 @@ export default function PanelUploads() {
                     onClick={() => setAssetFilter(filter.key)}
                     className={`h-6 shrink-0 rounded-full border px-2.5 text-[11px] transition-colors ${
                       isActive
-                        ? "border-primary bg-primary/25 text-primary-foreground"
-                        : "border-border/60 bg-background/50 text-muted-foreground hover:text-foreground"
+                        ? "border-amber-300/80 bg-amber-500/20 text-amber-50 shadow-[0_1px_6px_rgba(245,158,11,0.2)]"
+                        : "border-white/20 bg-black/30 text-white/80 hover:bg-black/45 hover:text-white"
                     }`}
                   >
                     <span>{filter.label}</span>
