@@ -21,6 +21,13 @@ type LocalProjectRecord = Omit<TProject, "createdAt" | "updatedAt"> & {
   updatedAt: string;
 };
 
+type ProjectDataUpdatePayload = {
+  data: any;
+  canvasSize?: TProject["canvasSize"];
+  canvasMode?: TProject["canvasMode"];
+  fps?: number;
+};
+
 class StorageService {
   private projectsAdapter: IndexedDBAdapter<LocalProjectRecord>;
   private savedSoundsAdapter: IndexedDBAdapter<SavedSoundsData>;
@@ -125,17 +132,32 @@ class StorageService {
     await this.projectsAdapter.set(normalized.id, this.toLocalProjectRecord(normalized));
   }
 
-  private async saveProjectDataLocal(projectId: string, data: any): Promise<void> {
+  private async saveProjectDataLocal(
+    projectId: string,
+    payload: ProjectDataUpdatePayload,
+  ): Promise<void> {
     const existing = await this.projectsAdapter.get(projectId);
     if (!existing) {
       throw new Error(`Project ${projectId} not found in local storage`);
     }
 
-    await this.projectsAdapter.set(projectId, {
+    const nextRecord: LocalProjectRecord = {
       ...existing,
-      data,
+      data: payload.data,
       updatedAt: new Date().toISOString(),
-    });
+    };
+
+    if (payload.canvasSize) {
+      nextRecord.canvasSize = payload.canvasSize;
+    }
+    if (payload.canvasMode) {
+      nextRecord.canvasMode = payload.canvasMode;
+    }
+    if (typeof payload.fps === "number") {
+      nextRecord.fps = payload.fps;
+    }
+
+    await this.projectsAdapter.set(projectId, nextRecord);
   }
 
   private async loadProjectLocal({ id }: { id: string }): Promise<TProject | null> {
@@ -235,9 +257,9 @@ class StorageService {
     }
   }
 
-  async saveProjectFull(projectId: string, data: any): Promise<void> {
+  async saveProjectFull(projectId: string, payload: ProjectDataUpdatePayload): Promise<void> {
     if (!(await this.shouldUseRemoteProjectApi())) {
-      await this.saveProjectDataLocal(projectId, data);
+      await this.saveProjectDataLocal(projectId, payload);
       return;
     }
 
@@ -245,11 +267,11 @@ class StorageService {
       const res = await fetch(`/api/projects/${projectId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data }),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
-        await this.saveProjectDataLocal(projectId, data).catch(() => {});
+        await this.saveProjectDataLocal(projectId, payload).catch(() => {});
         return;
       }
 
@@ -260,14 +282,14 @@ class StorageService {
         console.warn(
           `[storage] /api/projects/${projectId} returned ${res.status}, saving data locally`,
         );
-        await this.saveProjectDataLocal(projectId, data);
+        await this.saveProjectDataLocal(projectId, payload);
         return;
       }
 
       throw new Error(`Failed to save project data: ${res.statusText}`);
     } catch (e) {
       console.warn("[storage] Failed to save full project via API, saving locally", e);
-      await this.saveProjectDataLocal(projectId, data);
+      await this.saveProjectDataLocal(projectId, payload);
     }
   }
 

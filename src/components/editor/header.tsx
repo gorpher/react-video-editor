@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { IconShare } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,7 @@ import { Save } from "lucide-react";
 
 export default function Header() {
   const { studio } = useStudioStore();
-  const { aspectRatio, setCanvasSize } = useProjectStore();
+  const { aspectRatio, canvasSize, fps, setCanvasSize } = useProjectStore();
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isBatchExporting, setIsBatchExporting] = useState(false);
@@ -52,6 +52,14 @@ export default function Header() {
   const [projectName, setProjectName] = useState("\u672a\u547d\u540d\u9879\u76ee");
   const [nameDraft, setNameDraft] = useState("\u672a\u547d\u540d\u9879\u76ee");
   const [isEditingName, setIsEditingName] = useState(false);
+  const hasInitializedCanvasAutosaveRef = useRef(false);
+  const getCanvasMode = (): "preset" | "custom" => {
+    return DEFAULT_CANVAS_PRESETS.some(
+      (preset) => preset.width === canvasSize.width && preset.height === canvasSize.height,
+    )
+      ? "preset"
+      : "custom";
+  };
 
   const handleApplyCustomSize = () => {
     const w = parseInt(customWidth);
@@ -219,7 +227,12 @@ export default function Header() {
 
     try {
       const studioJSON = studio.exportToJSON();
-      await storageService.saveProjectFull(projectId, studioJSON);
+      await storageService.saveProjectFull(projectId, {
+        data: studioJSON,
+        canvasSize,
+        canvasMode: getCanvasMode(),
+        fps,
+      });
       if (showToast) {
         toast.success("已保存", { id: toastId });
       }
@@ -261,6 +274,9 @@ export default function Header() {
         project: {
           ...existing,
           name: nextName,
+          canvasSize,
+          canvasMode: getCanvasMode(),
+          fps,
           data: latestData,
           updatedAt: new Date(),
         },
@@ -315,7 +331,30 @@ export default function Header() {
       studio.off("history:changed", onStudioChange);
       clearTimeout(timeoutId);
     };
-  }, [studio, projectId]);
+  }, [studio, projectId, canvasSize.width, canvasSize.height, fps]);
+
+  useEffect(() => {
+    hasInitializedCanvasAutosaveRef.current = false;
+  }, [projectId]);
+
+  // Canvas size/FPS changes are not always part of studio history.
+  // Persist them with a lightweight silent save.
+  useEffect(() => {
+    if (!studio || !projectId) return;
+
+    if (!hasInitializedCanvasAutosaveRef.current) {
+      hasInitializedCanvasAutosaveRef.current = true;
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      void handleSave(false);
+    }, 400);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [studio, projectId, canvasSize.width, canvasSize.height, fps]);
 
   const handleNew = () => {
     if (!studio) return;

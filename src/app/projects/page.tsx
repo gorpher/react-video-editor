@@ -21,6 +21,31 @@ import {
 import { Input } from "@/components/ui/input";
 
 const DEFAULT_PROJECT_NAME = "\u672a\u547d\u540d\u9879\u76ee";
+const EXTERNAL_RATIO_PRESETS: Record<string, { width: number; height: number }> = {
+  "16:9": { width: 1920, height: 1080 },
+  "9:16": { width: 1080, height: 1920 },
+  "1:1": { width: 1080, height: 1080 },
+};
+
+function resolveExternalCanvasRatio(rawRatio?: string | null): {
+  canvasSize: { width: number; height: number };
+  canvasMode: "preset" | "custom";
+} {
+  const ratio = (rawRatio || "").trim();
+  const preset = EXTERNAL_RATIO_PRESETS[ratio];
+  if (preset) {
+    return {
+      canvasSize: preset,
+      canvasMode: "preset",
+    };
+  }
+
+  // Keep existing default behavior when ratio is not provided or invalid.
+  return {
+    canvasSize: { width: 1080, height: 1920 },
+    canvasMode: "preset",
+  };
+}
 
 // ─── Project Card ────────────────────────────────────────────────────────────
 
@@ -135,8 +160,17 @@ export default function ProjectsPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const handledExternalProjectIdRef = useRef<string | null>(null);
 
-  const createProjectDraft = ({ id, name }: { id: string; name: string }): TProject => {
+  const createProjectDraft = ({
+    id,
+    name,
+    ratio,
+  }: {
+    id: string;
+    name: string;
+    ratio?: string | null;
+  }): TProject => {
     const sceneId = generateUUID();
+    const { canvasSize, canvasMode } = resolveExternalCanvasRatio(ratio);
     return {
       id,
       name,
@@ -144,8 +178,8 @@ export default function ProjectsPage() {
       createdAt: new Date(),
       updatedAt: new Date(),
       currentSceneId: sceneId,
-      canvasSize: { width: 1080, height: 1920 },
-      canvasMode: "preset",
+      canvasSize,
+      canvasMode,
       fps: 30,
       data: null, // Scene data will be saved on first edit
     };
@@ -154,6 +188,7 @@ export default function ProjectsPage() {
   const handleExternalOpenOrCreate = async (
     externalProjectId: string,
     externalName?: string | null,
+    externalRatio?: string | null,
   ) => {
     const projectId = externalProjectId.trim();
     if (!projectId) return;
@@ -167,7 +202,11 @@ export default function ProjectsPage() {
       }
 
       const projectName = (externalName || "").trim() || DEFAULT_PROJECT_NAME;
-      const newProject = createProjectDraft({ id: projectId, name: projectName });
+      const newProject = createProjectDraft({
+        id: projectId,
+        name: projectName,
+        ratio: externalRatio,
+      });
       await storageService.saveProject({ project: newProject });
       router.replace(`/edit/${encodeURIComponent(newProject.id)}`);
     } catch (error) {
@@ -187,7 +226,7 @@ export default function ProjectsPage() {
 
     if (handledExternalProjectIdRef.current === externalProjectId) return;
     handledExternalProjectIdRef.current = externalProjectId;
-    void handleExternalOpenOrCreate(externalProjectId, params.get("name"));
+    void handleExternalOpenOrCreate(externalProjectId, params.get("name"), params.get("ratio"));
   }, []);
 
   const loadProjects = async () => {

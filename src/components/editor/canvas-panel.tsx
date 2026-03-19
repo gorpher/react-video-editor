@@ -30,6 +30,8 @@ export function CanvasPanel({ onReady }: CanvasPanelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const studioRef = useRef<Studio | null>(null);
   const onReadyRef = useRef(onReady);
+  const previousCanvasSizeRef = useRef<{ width: number; height: number } | null>(null);
+  const isAutoFittingRef = useRef(false);
   const { setStudio } = useStudioStore();
   const { canvasSize } = useProjectStore();
   const { theme, resolvedTheme } = useTheme();
@@ -46,9 +48,56 @@ export function CanvasPanel({ onReady }: CanvasPanelProps) {
 
   // Handle dimension changes
   useEffect(() => {
-    if (studioRef.current) {
-      studioRef.current.setSize(canvasSize.width, canvasSize.height);
+    const studio = studioRef.current;
+    if (!studio) return;
+
+    const previousSize = previousCanvasSizeRef.current;
+    previousCanvasSizeRef.current = { width: canvasSize.width, height: canvasSize.height };
+
+    studio.setSize(canvasSize.width, canvasSize.height);
+
+    // Initial mount should only set size; auto-fit is reserved for user-triggered size changes.
+    if (!previousSize) return;
+
+    if (previousSize.width === canvasSize.width && previousSize.height === canvasSize.height) {
+      return;
     }
+
+    if (isAutoFittingRef.current) return;
+    isAutoFittingRef.current = true;
+
+    const autoFitExistingVisualClips = async () => {
+      try {
+        const studioAny = studio as any;
+        const clips = Array.isArray(studioAny?.clips) ? (studioAny.clips as any[]) : [];
+        const visualClips = clips.filter(
+          (clip) =>
+            clip?.type === "Video" || clip?.type === "Image" || clip?.type === "Placeholder",
+        );
+
+        for (const clip of visualClips) {
+          try {
+            if (typeof studioAny.scaleToFit === "function") {
+              await studioAny.scaleToFit(clip);
+            } else if (typeof clip.scaleToFit === "function") {
+              await clip.scaleToFit(canvasSize.width, canvasSize.height);
+            }
+
+            if (typeof studioAny.centerClip === "function") {
+              await studioAny.centerClip(clip);
+            } else if (typeof clip.centerInScene === "function") {
+              clip.centerInScene(canvasSize.width, canvasSize.height);
+            }
+          } catch (clipError) {
+            console.warn("[CanvasPanel] Failed to auto-fit clip after canvas resize:", clipError);
+          }
+        }
+      } finally {
+        isAutoFittingRef.current = false;
+      }
+    };
+
+    void autoFitExistingVisualClips();
   }, [canvasSize]);
 
   // Handle theme changes
