@@ -13,6 +13,7 @@ import type { AifilmMediaItem } from "@/lib/aifilm-media";
 import { uploadFile } from "@/lib/upload-utils";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { useParams } from "next/navigation";
+import { clearTimelineAssetDragData, writeTimelineAssetDragData } from "@/lib/timeline-drag";
 interface VisualAsset {
   id: string;
   type: MediaType;
@@ -161,7 +162,23 @@ function AssetCard({
   const typeBadge = getAssetTypeBadge(asset.type);
 
   return (
-    <div className="flex flex-col gap-1.5 group">
+    <div
+      className="flex flex-col gap-1.5 group"
+      draggable
+      onDragStart={(event) => {
+        writeTimelineAssetDragData(event.dataTransfer, {
+          id: asset.id,
+          type: asset.type,
+          src: asset.src,
+          name: asset.name,
+          duration: asset.duration,
+        });
+        event.dataTransfer.effectAllowed = "copy";
+      }}
+      onDragEnd={() => {
+        clearTimelineAssetDragData();
+      }}
+    >
       <div className="relative aspect-square rounded-sm overflow-hidden bg-foreground/20 border border-transparent group-hover:border-primary/50 transition-all flex items-center justify-center">
         {asset.type === "image" ? (
           <img src={previewSrc} alt={asset.name} className="max-w-full max-h-full object-contain" />
@@ -202,20 +219,20 @@ function AssetCard({
           <span className="leading-none">{typeBadge.label}</span>
         </div>
 
-        <button
-          type="button"
-          className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/35 transition-colors"
-          onClick={(e) => {
-            e.stopPropagation();
-            onAdd(asset);
-          }}
-          title={String.fromCharCode(0x6dfb, 0x52a0, 0x5230, 0x8f68, 0x9053)}
-          aria-label={`${String.fromCharCode(0x6dfb, 0x52a0)} ${asset.name} ${String.fromCharCode(0x5230, 0x8f68, 0x9053)}`}
-        >
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-black opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all shadow">
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center bg-black/0 group-hover:bg-black/35 transition-colors">
+          <button
+            type="button"
+            className="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-black opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all shadow"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdd(asset);
+            }}
+            title={String.fromCharCode(0x6dfb, 0x52a0, 0x5230, 0x8f68, 0x9053)}
+            aria-label={`${String.fromCharCode(0x6dfb, 0x52a0)} ${asset.name} ${String.fromCharCode(0x5230, 0x8f68, 0x9053)}`}
+          >
             <Plus size={18} />
-          </span>
-        </button>
+          </button>
+        </div>
 
         {/* Remove Button (Minimalist on Hover) */}
         {asset.source === "local" && onDelete && (

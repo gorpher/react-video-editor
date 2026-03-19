@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { IconPlayerPause, IconPlayerPlay, IconPlus } from "@tabler/icons-react";
 import { useRef, useState, useEffect } from "react";
+import { clearTimelineAssetDragData, writeTimelineAssetDragData } from "@/lib/timeline-drag";
 
 export const AudioItem = ({
   item,
@@ -46,7 +47,22 @@ export const AudioItem = ({
   };
 
   return (
-    <div className="group relative flex items-center gap-3 p-2 bg-secondary rounded-sm border hover:border-white/10 transition-colors">
+    <div
+      className="group relative flex items-center gap-3 p-2 bg-secondary rounded-sm border hover:border-white/10 transition-colors"
+      draggable
+      onDragStart={(event) => {
+        writeTimelineAssetDragData(event.dataTransfer, {
+          id: String(item.id || item.url || item.text || crypto.randomUUID()),
+          type: "audio",
+          src: item.url,
+          name: item.text || "Audio",
+        });
+        event.dataTransfer.effectAllowed = "copy";
+      }}
+      onDragEnd={() => {
+        clearTimelineAssetDragData();
+      }}
+    >
       <audio
         ref={audioRef}
         src={item.url}

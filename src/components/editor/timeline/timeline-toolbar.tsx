@@ -15,6 +15,7 @@ import {
   ArrowLeftToLine,
   ArrowRightToLine,
   Scissors,
+  Plus,
   Volume2,
   VolumeX,
 } from "lucide-react";
@@ -23,6 +24,14 @@ import { DEFAULT_FPS } from "@/stores/project-store";
 import { formatTimeCode } from "@/lib/time";
 import { EditableTimecode } from "@/components/ui/editable-timecode";
 import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import {
   IconPlayerPauseFilled,
@@ -31,18 +40,29 @@ import {
   IconPlayerSkipForward,
 } from "@tabler/icons-react";
 
+type QuickTrackType = "Video" | "Image" | "Audio" | "Text";
+
+const ADD_TRACK_OPTIONS: Array<{ type: QuickTrackType; label: string }> = [
+  { type: "Video", label: "\u89c6\u9891\u8f68\u9053" },
+  { type: "Image", label: "\u56fe\u7247\u8f68\u9053" },
+  { type: "Audio", label: "\u97f3\u9891\u8f68\u9053" },
+  { type: "Text", label: "\u6587\u5b57\u8f68\u9053" },
+];
+
 export function TimelineToolbar({
   zoomLevel,
   setZoomLevel,
   onDelete,
   onDuplicate,
   onSplit,
+  onAddTrack,
 }: {
   zoomLevel: number;
   setZoomLevel: (zoom: number) => void;
   onDelete?: () => void;
   onDuplicate?: () => void;
   onSplit?: () => void;
+  onAddTrack?: (trackType: QuickTrackType) => void;
 }) {
   const { currentTime, duration, isPlaying, toggle, seek } = usePlaybackStore();
   const { studio } = useStudioStore();
@@ -218,6 +238,27 @@ export function TimelineToolbar({
             </TooltipTrigger>
             <TooltipContent>{isOriginalAudioMuted ? "恢复原声" : "关闭原声"}</TooltipContent>
           </Tooltip>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={!onAddTrack}
+                title="\u65b0\u5efa\u8f68\u9053"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" side="bottom">
+              <DropdownMenuLabel>{"\u65b0\u5efa\u8f68\u9053"}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {ADD_TRACK_OPTIONS.map((option) => (
+                <DropdownMenuItem key={option.type} onClick={() => onAddTrack?.(option.type)}>
+                  {option.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </TooltipProvider>
       </div>
 

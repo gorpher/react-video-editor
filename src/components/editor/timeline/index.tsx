@@ -10,10 +10,12 @@ import {
   Ellipsis,
   ArrowUp,
   ArrowDown,
+  Trash2,
 } from "lucide-react";
 import { useTimelineStore } from "@/stores/timeline-store";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { useStudioStore } from "@/stores/studio-store";
+import { useProjectStore } from "@/stores/project-store";
 import { useTheme } from "next-themes";
 
 import { useTimelineZoom } from "@/hooks/use-timeline-zoom";
@@ -21,7 +23,7 @@ import { useTimelineZoom } from "@/hooks/use-timeline-zoom";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { TimelinePlayhead, useTimelinePlayheadRuler } from "./timeline-playhead";
-import type { TimelineTrack } from "@/types/timeline";
+import type { TimelineTrack, TrackType } from "@/types/timeline";
 import { TimelineRuler } from "./timeline-ruler";
 import {
   getTrackHeight,
@@ -36,14 +38,40 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { Audio as StudioAudio, Image as StudioImage, Log, Video as StudioVideo } from "openvideo";
+import { toast } from "sonner";
+import { generateUUID } from "@/utils/id";
+import type { MediaType } from "@/types/media";
+import {
+  clearTimelineAssetDragData,
+  hasTimelineAssetDragData,
+  readTimelineAssetDragData,
+  type TimelineAssetDragPayload,
+} from "@/lib/timeline-drag";
+
+const TRACK_MENU_LABELS = {
+  moveTrackUp: "\u4e0a\u79fb\u8f68\u9053",
+  moveTrackDown: "\u4e0b\u79fb\u8f68\u9053",
+  deleteTrack: "\u5220\u9664\u8f68\u9053",
+};
+
+type StudioTrackLike = {
+  id: string;
+  type?: string;
+  clipIds?: string[];
+};
+
+const DEFAULT_IMAGE_DURATION_US = 5_000_000;
 
 export function Timeline() {
-  const { tracks, clips, getTotalDuration } = useTimelineStore();
+  const { tracks, clips, getTotalDuration, setTracks: setTimelineTracks } = useTimelineStore();
   const { duration, seek, setDuration } = usePlaybackStore();
   const { studio } = useStudioStore();
+  const { canvasSize } = useProjectStore();
   const { theme, resolvedTheme } = useTheme();
 
   const currentTheme = (theme === "system" ? resolvedTheme : theme) as "dark" | "light";
@@ -89,9 +117,13 @@ export function Timeline() {
   const rulerScrollRef = useRef<HTMLDivElement>(null);
   const tracksScrollRef = useRef<HTMLDivElement>(null);
   const trackLabelsRef = useRef<HTMLDivElement>(null);
+  const tracksAreaRef = useRef<HTMLDivElement>(null);
+  const tracksContentRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
   const timelineCanvasRef = useRef<TimelineCanvas | null>(null);
   const isUpdatingRef = useRef(false);
+  const [dragHoverTrackId, setDragHoverTrackId] = useState<string | null>(null);
+  const [isTimelineDragActive, setIsTimelineDragActive] = useState(false);
 
   const handleScrollChange = useCallback(
     (scrollX: number) => {
@@ -337,6 +369,420 @@ export function Timeline() {
     studio?.splitSelected(splitTime);
   }, [studio]);
 
+  const isTrackTypeCompatible = useCallback((assetType: MediaType, trackType?: string) => {
+    const normalizedType = (trackType || "").toLowerCase();
+    if (assetType === "audio") {
+      return normalizedType === "audio";
+    }
+    if (assetType === "image") {
+      return (
+        normalizedType === "image" || normalizedType === "video" || normalizedType === "placeholder"
+      );
+    }
+    return normalizedType === "video" || normalizedType === "placeholder";
+  }, []);
+
+  const getStudioTracks = useCallback((): StudioTrackLike[] => {
+    const studioTracks = (studio as any)?.getTracks?.();
+    if (Array.isArray(studioTracks)) {
+      return studioTracks as StudioTrackLike[];
+    }
+    return tracks as unknown as StudioTrackLike[];
+  }, [studio, tracks]);
+
+  const getTrackClipInfos = useCallback(
+    (track: StudioTrackLike): Array<{ id: string; from: number; to: number }> => {
+      const clipIds = Array.isArray(track.clipIds) ? track.clipIds : [];
+      const clipInfos: Array<{ id: string; from: number; to: number }> = [];
+      const getClip = (studio as any)?.getClip ?? (studio as any)?.getClipById;
+
+      for (const clipId of clipIds) {
+        if (typeof clipId !== "string" || typeof getClip !== "function") continue;
+        const clip = getClip.call(studio, clipId) as
+          | {
+              display?: { from?: number; to?: number };
+              duration?: number;
+            }
+          | undefined;
+
+        const from = Number(clip?.display?.from);
+        const to = Number(clip?.display?.to);
+        if (Number.isFinite(from) && Number.isFinite(to) && to > from) {
+          clipInfos.push({ id: clipId, from, to });
+          continue;
+        }
+
+        const duration = Number(clip?.duration);
+        if (Number.isFinite(from) && Number.isFinite(duration) && duration > 0) {
+          clipInfos.push({ id: clipId, from, to: from + duration });
+        }
+      }
+
+      return clipInfos.sort((a, b) => a.from - b.from);
+    },
+    [studio],
+  );
+
+  const getClipDurationUs = useCallback(
+    (
+      clip: {
+        display?: { from?: number; to?: number };
+        duration?: number;
+      },
+      fallbackDurationUs?: number,
+    ) => {
+      const from = Number(clip.display?.from);
+      const to = Number(clip.display?.to);
+      if (Number.isFinite(from) && Number.isFinite(to) && to > from) {
+        return to - from;
+      }
+
+      const duration = Number(clip.duration);
+      if (Number.isFinite(duration) && duration > 0) {
+        return duration;
+      }
+
+      if (
+        typeof fallbackDurationUs === "number" &&
+        Number.isFinite(fallbackDurationUs) &&
+        fallbackDurationUs > 0
+      ) {
+        return fallbackDurationUs;
+      }
+
+      return 0;
+    },
+    [],
+  );
+
+  const rippleShiftTrackClips = useCallback(
+    async (trackId: string | undefined, insertStartUs: number, deltaUs: number) => {
+      if (!studio || !trackId || deltaUs <= 0) return;
+
+      const targetTrack = getStudioTracks().find((track) => track.id === trackId);
+      if (!targetTrack) return;
+
+      const clipsToShift = getTrackClipInfos(targetTrack).filter(
+        (clip) => clip.from >= insertStartUs,
+      );
+      if (clipsToShift.length === 0) return;
+
+      const shiftedUpdates = clipsToShift
+        .sort((a, b) => b.from - a.from)
+        .map((clip) => ({
+          id: clip.id,
+          updates: {
+            display: {
+              from: clip.from + deltaUs,
+              to: clip.to + deltaUs,
+            },
+          },
+        }));
+
+      const batchUpdate = (studio as any)?.updateClips;
+      if (typeof batchUpdate === "function") {
+        await batchUpdate.call(studio, shiftedUpdates);
+        return;
+      }
+
+      const singleUpdate = (studio as any)?.updateClip;
+      if (typeof singleUpdate === "function") {
+        for (const update of shiftedUpdates) {
+          await singleUpdate.call(studio, update.id, update.updates);
+        }
+      }
+    },
+    [getStudioTracks, getTrackClipInfos, studio],
+  );
+
+  const buildTrackName = useCallback((trackType: TrackType, existingTracks: StudioTrackLike[]) => {
+    const sequence =
+      existingTracks.filter(
+        (track) => String(track.type || "").toLowerCase() === trackType.toLowerCase(),
+      ).length + 1;
+    return `${trackType} ${sequence}`;
+  }, []);
+
+  const appendTrack = useCallback(
+    (trackType: TrackType) => {
+      const currentTracks = useTimelineStore.getState().tracks as unknown as StudioTrackLike[];
+      const newTrack = {
+        id: generateUUID(),
+        name: buildTrackName(trackType, currentTracks),
+        type: trackType,
+        clipIds: [],
+        muted: false,
+      };
+      const nextTracks = [...currentTracks, newTrack] as TimelineTrack[];
+
+      setTimelineTracks(nextTracks);
+      if (studio && typeof (studio as any).setTracks === "function") {
+        (studio as any).setTracks(nextTracks);
+      }
+
+      return newTrack.id;
+    },
+    [buildTrackName, setTimelineTracks, studio],
+  );
+
+  const handleCreateTrack = useCallback(
+    (trackType: TrackType) => {
+      appendTrack(trackType);
+      toast.success(`${trackType} created.`);
+    },
+    [appendTrack],
+  );
+
+  const handleDeleteTrack = useCallback(
+    async (trackId: string) => {
+      const currentTracks = useTimelineStore.getState().tracks;
+      const targetTrack = currentTracks.find((track) => track.id === trackId);
+      if (!targetTrack) return;
+
+      const clipIds = Array.isArray(targetTrack.clipIds) ? targetTrack.clipIds : [];
+      if (clipIds.length > 0) {
+        const confirmed = window.confirm(
+          `Delete this track and ${clipIds.length} clip(s) on it? This cannot be undone.`,
+        );
+        if (!confirmed) return;
+
+        try {
+          if (studio && typeof (studio as any).removeClipsById === "function") {
+            await (studio as any).removeClipsById(clipIds);
+          } else if (studio && typeof (studio as any).removeClipById === "function") {
+            for (const clipId of clipIds) {
+              await (studio as any).removeClipById(clipId);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to remove clips before deleting track:", error);
+          toast.error("Failed to delete track clips.");
+          return;
+        }
+      }
+
+      const nextTracks = useTimelineStore.getState().tracks.filter((track) => track.id !== trackId);
+      setTimelineTracks(nextTracks);
+      if (studio && typeof (studio as any).setTracks === "function") {
+        (studio as any).setTracks(nextTracks);
+      }
+      toast.success("Track deleted.");
+    },
+    [setTimelineTracks, studio],
+  );
+
+  const getTrackIdFromClientY = useCallback(
+    (clientY: number) => {
+      const tracksAreaEl = tracksAreaRef.current;
+      if (!tracksAreaEl) return undefined;
+
+      const scrollTop = trackLabelsRef.current?.scrollTop || 0;
+      const localY = clientY - tracksAreaEl.getBoundingClientRect().top + scrollTop;
+      let cursorY = TIMELINE_CONSTANTS.TRACK_PADDING_TOP;
+
+      for (const track of tracks) {
+        const trackHeight = getTrackHeight(track.type);
+        if (localY >= cursorY && localY <= cursorY + trackHeight) {
+          return track.id;
+        }
+        cursorY += trackHeight + TIMELINE_CONSTANTS.TRACK_SPACING;
+      }
+
+      return undefined;
+    },
+    [tracks],
+  );
+
+  const getFallbackTrackIdForAsset = useCallback(
+    (assetType: MediaType) => {
+      const compatibleTrack = tracks.find((track) => isTrackTypeCompatible(assetType, track.type));
+      return compatibleTrack?.id;
+    },
+    [isTrackTypeCompatible, tracks],
+  );
+
+  const ensureTargetTrackId = useCallback(
+    (assetType: MediaType, preferredTrackId?: string) => {
+      if (preferredTrackId) {
+        const preferredTrack = tracks.find((track) => track.id === preferredTrackId);
+        if (preferredTrack && isTrackTypeCompatible(assetType, preferredTrack.type)) {
+          return preferredTrack.id;
+        }
+      }
+
+      const fallbackTrackId = getFallbackTrackIdForAsset(assetType);
+      if (fallbackTrackId) return fallbackTrackId;
+
+      if (assetType === "audio") {
+        return appendTrack("Audio");
+      }
+      if (assetType === "image") {
+        return appendTrack("Image");
+      }
+      return appendTrack("Video");
+    },
+    [appendTrack, getFallbackTrackIdForAsset, isTrackTypeCompatible, tracks],
+  );
+
+  const getDropInsertTimeUs = useCallback(
+    (clientX: number) => {
+      const fallbackUs = Math.max(
+        0,
+        Math.round(usePlaybackStore.getState().currentTime * 1_000_000),
+      );
+      const trackContentEl = tracksContentRef.current;
+      if (!trackContentEl) return fallbackUs;
+
+      const rect = trackContentEl.getBoundingClientRect();
+      const localX = Math.max(0, clientX - rect.left + scrollLeft);
+      const rawTime = localX / (TIMELINE_CONSTANTS.PIXELS_PER_SECOND * zoomLevel);
+      const snappedTime = snapTimeToFrame(Math.max(0, rawTime), 30);
+      return Math.max(0, Math.round(snappedTime * 1_000_000));
+    },
+    [scrollLeft, zoomLevel],
+  );
+
+  const addDraggedAssetToTrack = useCallback(
+    async (payload: TimelineAssetDragPayload, trackId: string, insertStartUs: number) => {
+      if (!studio) return;
+
+      const fallbackDurationUs =
+        typeof payload.duration === "number" &&
+        Number.isFinite(payload.duration) &&
+        payload.duration > 0
+          ? payload.duration * 1_000_000
+          : undefined;
+
+      if (payload.type === "image") {
+        const imageClip = await StudioImage.fromUrl(payload.src);
+        imageClip.name = payload.name;
+        await rippleShiftTrackClips(trackId, insertStartUs, DEFAULT_IMAGE_DURATION_US);
+        imageClip.display = {
+          from: insertStartUs,
+          to: insertStartUs + DEFAULT_IMAGE_DURATION_US,
+        };
+        imageClip.duration = DEFAULT_IMAGE_DURATION_US;
+        await imageClip.scaleToFit(canvasSize.width, canvasSize.height);
+        imageClip.centerInScene(canvasSize.width, canvasSize.height);
+        await studio.addClip(imageClip, { trackId });
+        return;
+      }
+
+      if (payload.type === "audio") {
+        const audioClip = await StudioAudio.fromUrl(payload.src);
+        audioClip.name = payload.name;
+        const durationUs = getClipDurationUs(audioClip as any, fallbackDurationUs);
+        await rippleShiftTrackClips(trackId, insertStartUs, durationUs);
+        if (durationUs > 0) {
+          (audioClip as any).display = {
+            from: insertStartUs,
+            to: insertStartUs + durationUs,
+          };
+        }
+        await studio.addClip(audioClip, { trackId });
+        return;
+      }
+
+      const videoClip = await StudioVideo.fromUrl(payload.src);
+      videoClip.name = payload.name;
+      const durationUs = getClipDurationUs(videoClip as any, fallbackDurationUs);
+      await rippleShiftTrackClips(trackId, insertStartUs, durationUs);
+      if (durationUs > 0) {
+        (videoClip as any).display = {
+          from: insertStartUs,
+          to: insertStartUs + durationUs,
+        };
+      }
+      await videoClip.scaleToFit(canvasSize.width, canvasSize.height);
+      videoClip.centerInScene(canvasSize.width, canvasSize.height);
+      await studio.addClip(videoClip, { trackId });
+    },
+    [canvasSize.height, canvasSize.width, getClipDurationUs, rippleShiftTrackClips, studio],
+  );
+
+  const clearDragState = useCallback(() => {
+    setIsTimelineDragActive(false);
+    setDragHoverTrackId(null);
+    clearTimelineAssetDragData();
+  }, []);
+
+  const handleTimelineDragOver = useCallback(
+    (event: React.DragEvent<HTMLElement>) => {
+      if (!hasTimelineAssetDragData(event.dataTransfer)) return;
+
+      const payload = readTimelineAssetDragData(event.dataTransfer);
+      if (!payload) return;
+
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+      setIsTimelineDragActive(true);
+
+      const hoveredTrackId = getTrackIdFromClientY(event.clientY);
+      if (hoveredTrackId) {
+        const hoveredTrack = tracks.find((track) => track.id === hoveredTrackId);
+        if (hoveredTrack && isTrackTypeCompatible(payload.type, hoveredTrack.type)) {
+          setDragHoverTrackId(hoveredTrackId);
+          return;
+        }
+      }
+
+      setDragHoverTrackId(getFallbackTrackIdForAsset(payload.type) || null);
+    },
+    [getFallbackTrackIdForAsset, getTrackIdFromClientY, isTrackTypeCompatible, tracks],
+  );
+
+  const handleTimelineDrop = useCallback(
+    async (event: React.DragEvent<HTMLElement>) => {
+      const payload = readTimelineAssetDragData(event.dataTransfer);
+      if (!payload) {
+        clearDragState();
+        return;
+      }
+
+      event.preventDefault();
+      clearDragState();
+
+      if (!studio) {
+        toast.error("Editor is not ready yet.");
+        return;
+      }
+
+      const hoveredTrackId = getTrackIdFromClientY(event.clientY);
+      const targetTrackId = ensureTargetTrackId(payload.type, hoveredTrackId);
+      if (!targetTrackId) {
+        toast.error("No compatible track is available.");
+        return;
+      }
+
+      const insertStartUs = getDropInsertTimeUs(event.clientX);
+      try {
+        await addDraggedAssetToTrack(payload, targetTrackId, insertStartUs);
+      } catch (error) {
+        Log.error("Failed to add dragged asset to timeline:", error);
+        toast.error("Failed to add asset to timeline.");
+      }
+    },
+    [
+      addDraggedAssetToTrack,
+      clearDragState,
+      ensureTargetTrackId,
+      getDropInsertTimeUs,
+      getTrackIdFromClientY,
+      studio,
+    ],
+  );
+
+  const handleTimelineDragLeave = useCallback(
+    (event: React.DragEvent<HTMLElement>) => {
+      const nextTarget = event.relatedTarget;
+      if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
+        return;
+      }
+      clearDragState();
+    },
+    [clearDragState],
+  );
+
   useEditorHotkeys({
     timelineCanvas: timelineCanvasRef.current,
     setZoomLevel,
@@ -356,6 +802,7 @@ export function Timeline() {
         onDelete={handleDelete}
         onDuplicate={handleDuplicate}
         onSplit={handleSplit}
+        onAddTrack={(trackType) => handleCreateTrack(trackType)}
       />
       <TimelineStudioSync timelineCanvas={timelineCanvasRef.current} />
 
@@ -378,16 +825,15 @@ export function Timeline() {
         />
 
         {/* Timeline Header with Ruler */}
-        <div style={{ opacity: duration === 0 ? 0 : 1 }} className="flex sticky top-0">
+        <div className="flex sticky top-0">
           {/* Track Labels Header */}
           <div className="w-16 shrink-0 bg-card border-r flex items-center justify-between h-6">
-            {/* Empty space */}
             <span className="text-sm font-medium text-muted-foreground opacity-0">.</span>
           </div>
 
           {/* Timeline Ruler */}
           <div
-            className="flex-1 relative overflow-hidden h-6"
+            className={cn("flex-1 relative overflow-hidden h-6", duration === 0 && "opacity-0")}
             onWheel={(e) => {
               // Check if this is horizontal scrolling - if so, don't handle it here
               if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
@@ -435,7 +881,16 @@ export function Timeline() {
         </div>
 
         {/* Tracks Area */}
-        <div className="flex-1 flex overflow-hidden">
+        <div
+          ref={tracksAreaRef}
+          className={cn(
+            "flex-1 flex overflow-hidden transition-colors",
+            isTimelineDragActive && "bg-primary/5",
+          )}
+          onDragOver={handleTimelineDragOver}
+          onDrop={handleTimelineDrop}
+          onDragLeave={handleTimelineDragLeave}
+        >
           {/* Track Labels */}
           {tracks.length > 0 && (
             <div
@@ -459,7 +914,12 @@ export function Timeline() {
                     )}
 
                     <div
-                      className={cn("flex items-center px-3 group bg-input/40")}
+                      className={cn(
+                        "flex items-center px-3 group transition-colors",
+                        dragHoverTrackId === track.id
+                          ? "bg-primary/15 ring-1 ring-inset ring-primary/40"
+                          : "bg-input/40",
+                      )}
                       style={{ height: getTrackHeight(track.type as any) }}
                     >
                       <div className="flex items-center justify-center flex-1 min-w-0 gap-1">
@@ -479,7 +939,7 @@ export function Timeline() {
                               }}
                             >
                               <ArrowUp className="size-4 mr-2" />
-                              Move track up
+                              {TRACK_MENU_LABELS.moveTrackUp}
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               disabled={index === tracks.length - 1}
@@ -489,7 +949,17 @@ export function Timeline() {
                               }}
                             >
                               <ArrowDown className="size-4 mr-2" />
-                              Move track down
+                              {TRACK_MENU_LABELS.moveTrackDown}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={() => {
+                                void handleDeleteTrack(track.id);
+                              }}
+                            >
+                              <Trash2 className="size-4 mr-2" />
+                              {TRACK_MENU_LABELS.deleteTrack}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -513,7 +983,13 @@ export function Timeline() {
           )}
 
           {/* Timeline Tracks Content */}
-          <div className="flex-1 relative overflow-hidden">
+          <div
+            ref={tracksContentRef}
+            className={cn(
+              "flex-1 relative overflow-hidden transition-colors",
+              isTimelineDragActive && "bg-primary/5",
+            )}
+          >
             <div id="timeline-canvas" className="w-full h-full" />
           </div>
         </div>

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { storageService } from "@/lib/storage/storage-service";
 import type { MediaFile } from "@/types/media";
 import { uploadFile } from "@/lib/upload-utils";
+import { clearTimelineAssetDragData, writeTimelineAssetDragData } from "@/lib/timeline-drag";
 
 const STORAGE_KEY = "designcombo_uploads";
 const PROJECT_ID = "local-uploads";
@@ -141,23 +142,39 @@ export default function PanelImages() {
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-x-3 gap-y-4">
             {filtered.map((asset) => (
-              <div key={asset.id} className="flex flex-col gap-1.5 group">
+              <div
+                key={asset.id}
+                className="flex flex-col gap-1.5 group"
+                draggable
+                onDragStart={(event) => {
+                  writeTimelineAssetDragData(event.dataTransfer, {
+                    id: asset.id,
+                    type: "image",
+                    src: asset.src,
+                    name: asset.name,
+                  });
+                  event.dataTransfer.effectAllowed = "copy";
+                }}
+                onDragEnd={() => {
+                  clearTimelineAssetDragData();
+                }}
+              >
                 <div className="relative aspect-square rounded-sm overflow-hidden bg-foreground/20 border border-transparent group-hover:border-primary/50 transition-all">
                   <img
                     src={asset.src}
                     alt={asset.name}
                     className="max-w-full max-h-full object-contain w-full h-full"
                   />
-                  <button
-                    type="button"
-                    aria-label="Add image to canvas"
-                    className="absolute inset-0 z-10 flex items-center justify-center bg-black/0 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:bg-black/35 group-hover:pointer-events-auto transition-all"
-                    onClick={() => addItemToCanvas(asset)}
-                  >
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-black shadow-md">
+                  <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center bg-black/0 opacity-0 group-hover:opacity-100 group-hover:bg-black/35 transition-all">
+                    <button
+                      type="button"
+                      aria-label="Add image to canvas"
+                      className="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-black shadow-md"
+                      onClick={() => addItemToCanvas(asset)}
+                    >
                       <Plus size={16} />
-                    </span>
-                  </button>
+                    </button>
+                  </div>
                   <button
                     type="button"
                     className="absolute top-1 right-1 z-20 p-1 rounded bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive"
