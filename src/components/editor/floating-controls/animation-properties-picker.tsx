@@ -399,6 +399,12 @@ export function AnimationPropertiesPicker() {
     setMirrorEnabled(mirror);
   }, [clipDuration, activeTab, animation, typeClip]);
 
+  useEffect(() => {
+    const hasProperties = Object.values(keyframes).some((frame) => Object.keys(frame).length > 0);
+
+    console.log(hasProperties);
+  }, [keyframes]);
+
   return (
     <div
       ref={containerRef}
@@ -622,6 +628,10 @@ export function AnimationPropertiesPicker() {
               <Button
                 onClick={typeClip === "Caption" ? handleApplyToAllCaptions : handleSave}
                 className="flex-1"
+                disabled={
+                  !preset &&
+                  !Object.values(keyframes).some((frame) => Object.keys(frame).length > 0)
+                }
               >
                 {mode === "add" ? "Add" : "Save"}
               </Button>
