@@ -226,7 +226,6 @@ export function TransitionProperties({ clip }: TransitionPropertiesProps) {
         })}
       </div>
 
-      {/* ✅ Portal global (solo uno) */}
       {dragState &&
         createPortal(
           <div
