@@ -6,6 +6,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useStudioStore } from "@/stores/studio-store";
 import { Loader2, Timer } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Icons } from "@/components/shared/icons";
 
 interface TransitionPropertiesProps {
   clip: IClip;
@@ -30,6 +32,12 @@ export function TransitionProperties({ clip }: TransitionPropertiesProps) {
 
   const [loaded, setLoaded] = React.useState(LOADED_CACHE);
   const [localDuration, setLocalDuration] = React.useState(transitionClip.duration / 1_000_000);
+  const [dragState, setDragState] = React.useState<{
+    x: number;
+    y: number;
+    overTimeline: boolean;
+    effect: any;
+  } | null>(null);
 
   React.useEffect(() => {
     setLocalDuration(transitionClip.duration / 1_000_000);
@@ -138,28 +146,57 @@ export function TransitionProperties({ clip }: TransitionPropertiesProps) {
   const allTransitions = getTransitionOptions();
 
   const renderTransitionList = (list: typeof allTransitions) => (
-    <div
-      className={`grid grid-cols-[repeat(auto-fill,minmax(92px,1fr))] gap-2.5 justify-items-center p-2 transition-all duration-200`}
-    >
-      {list.map((effect) => {
-        const isReady = loaded[effect.key]?.static && loaded[effect.key]?.dynamic;
+    <>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(92px,1fr))] gap-2.5 justify-items-center p-2 transition-all duration-200">
+        {list.map((effect) => {
+          const isReady = loaded[effect.key]?.static && loaded[effect.key]?.dynamic;
 
-        return (
-          <div
-            key={effect.key}
-            draggable
-            onDragStart={(e) => {
-              e.dataTransfer.setData("text/plain", effect.key);
-              e.dataTransfer.setData("type", "transition");
-            }}
-            className="flex w-full items-center gap-2 flex-col group cursor-pointer relative select-none"
-            onClick={() => {
-              if (!studio) return;
-              handleUpdate({ key: effect.key });
-            }}
-          >
-            <div className="relative w-full aspect-video rounded-md bg-input/30 border overflow-hidden">
-              <>
+          return (
+            <div
+              key={effect.key}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData("text/plain", effect.key);
+                e.dataTransfer.setData("type", "transition");
+
+                const img = new Image();
+                img.src =
+                  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+                e.dataTransfer.setDragImage(img, 0, 0);
+
+                setDragState({
+                  x: e.clientX,
+                  y: e.clientY,
+                  overTimeline: false,
+                  effect, // 👈 guardamos el effect activo
+                });
+              }}
+              onDrag={(e) => {
+                if (e.clientX === 0 && e.clientY === 0) return;
+
+                const elements = document.elementsFromPoint(e.clientX, e.clientY);
+
+                const overTimeline = elements.some((el) => el.id === "timeline-canvas");
+
+                setDragState((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        x: e.clientX,
+                        y: e.clientY,
+                        overTimeline,
+                      }
+                    : null,
+                );
+              }}
+              onDragEnd={() => setDragState(null)}
+              className="flex w-full items-center gap-2 flex-col group cursor-pointer relative select-none"
+              onClick={() => {
+                if (!studio) return;
+                handleUpdate({ key: effect.key });
+              }}
+            >
+              <div className="relative w-full aspect-video rounded-md bg-input/30 border overflow-hidden">
                 {!isReady && (
                   <div className="absolute inset-0 z-10 flex items-center justify-center">
                     <Loader2 className="animate-spin text-muted-foreground" />
@@ -170,35 +207,58 @@ export function TransitionProperties({ clip }: TransitionPropertiesProps) {
                   src={effect.previewStatic}
                   onLoad={() => markLoaded(effect.key, "static")}
                   loading="lazy"
-                  className="
-                absolute inset-0 w-full h-full object-cover rounded-sm
-                transition-opacity duration-150
-                opacity-100 group-hover:opacity-0
-              "
+                  className="absolute inset-0 w-full h-full object-cover rounded-sm transition-opacity duration-150 opacity-100 group-hover:opacity-0"
                 />
 
                 <img
                   src={effect.previewDynamic}
                   onLoad={() => markLoaded(effect.key, "dynamic")}
                   loading="lazy"
-                  className="
-                absolute inset-0 w-full h-full object-cover rounded-sm
-                transition-opacity duration-150
-                opacity-0 group-hover:opacity-100
-              "
+                  className="absolute inset-0 w-full h-full object-cover rounded-sm transition-opacity duration-150 opacity-0 group-hover:opacity-100"
                 />
-              </>
 
-              <div
-                className={`absolute bottom-0 left-0 w-full p-2 bg-gradient-to-t from-black/80 to-transparent text-white text-xs font-medium truncate text-center transition-opacity duration-150 group-hover:opacity-0`}
-              >
-                {effect.label}
+                <div className="absolute bottom-0 left-0 w-full p-2 bg-gradient-to-t from-black/80 to-transparent text-white text-xs font-medium truncate text-center transition-opacity duration-150 group-hover:opacity-0">
+                  {effect.label}
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+
+      {/* ✅ Portal global (solo uno) */}
+      {dragState &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              left: dragState.x + 15,
+              top: dragState.y + 15,
+              pointerEvents: "none",
+              zIndex: 99999,
+            }}
+          >
+            {dragState.overTimeline ? (
+              <div className="w-12 h-12 bg-black rounded flex items-center justify-center opacity-90 shadow-lg">
+                <Icons.transition className="text-white w-6 h-6" />
+              </div>
+            ) : (
+              <div className="w-20 aspect-video rounded-md bg-input/80 border overflow-hidden shadow-xl relative">
+                {dragState.effect?.previewStatic && (
+                  <img
+                    src={dragState.effect.previewStatic}
+                    className="w-full h-full object-cover rounded-sm"
+                  />
+                )}
+                <div className="absolute bottom-0 left-0 w-full p-1 bg-gradient-to-t from-black/80 to-transparent text-white text-[10px] font-medium truncate text-center">
+                  {dragState.effect?.label}
+                </div>
+              </div>
+            )}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 
   // ─── Custom presets state ──────────────────────────────────────────────────
@@ -273,7 +333,12 @@ export function TransitionProperties({ clip }: TransitionPropertiesProps) {
             <Slider
               value={[localDuration]}
               onValueChange={(v) => setLocalDuration(v[0])}
-              onValueCommit={(v) => handleUpdate({ duration: v[0] * 1_000_000 })}
+              onValueCommit={(v) => {
+                const fps = 30;
+                let frameCount = Math.round(v[0] * fps);
+                if (frameCount % 2 !== 0) frameCount += 1;
+                handleUpdate({ duration: (frameCount / fps) * 1_000_000 });
+              }}
               max={maxDurationInSeconds}
               min={minDurationInSeconds}
               step={0.1}

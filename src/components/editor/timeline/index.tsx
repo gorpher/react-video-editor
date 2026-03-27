@@ -580,12 +580,46 @@ export function Timeline() {
                       const existingTransition = timelineCanvasRef.current.findTransition(x, y);
 
                       if (existingTransition) {
+                        const clipA = clips[existingTransition.clipAId];
+                        const clipB = clips[existingTransition.clipBId];
+                        const minDuration = Math.min(
+                          clipA?.duration ?? Infinity,
+                          clipB?.duration ?? Infinity,
+                        );
+                        let duration = minDuration === Infinity ? 2_000_000 : minDuration * 0.25;
+                        const fps = 30;
+                        let frameCount = Math.round((duration / 1_000_000) * fps);
+                        if (frameCount % 2 !== 0) frameCount += 1;
+                        duration = Math.round((frameCount / fps) * 1_000_000);
+
                         await studio.addTransition(
                           transitionKey,
-                          2_000_000,
+                          duration,
                           existingTransition.clipAId,
                           existingTransition.clipBId,
                         );
+                        // Get the newly added transition (it will be connected to these two clips)
+                        const latestClips = useTimelineStore.getState().clips;
+                        const transitionArray = Object.values(latestClips).filter(
+                          (c: any) =>
+                            c.type === "Transition" &&
+                            c.fromClipId === existingTransition.clipAId &&
+                            c.toClipId === existingTransition.clipBId,
+                        );
+                        if (transitionArray.length > 0) {
+                          const tClip = transitionArray[transitionArray.length - 1];
+                          const cA = latestClips[existingTransition.clipAId];
+                          const cB = latestClips[existingTransition.clipBId];
+                          if (cA && cB) {
+                            await (studio as any).updateTransition(tClip.id, {
+                              duration: duration,
+                              fromClipDurationMicro:
+                                (cA.sourceDuration || cA.duration) - duration / 2,
+                              toClipDurationMicro:
+                                (cB.sourceDuration || cB.duration) - duration / 2,
+                            });
+                          }
+                        }
                       } else {
                         const junction = timelineCanvasRef.current.getJunction(
                           x,
@@ -593,12 +627,44 @@ export function Timeline() {
                           true, // Use expanded logic for drop as well
                         );
                         if (junction) {
+                          const minDuration = Math.min(
+                            junction.clipA.duration ?? Infinity,
+                            junction.clipB.duration ?? Infinity,
+                          );
+                          let duration = minDuration === Infinity ? 2_000_000 : minDuration * 0.25;
+                          const fps = 30;
+                          let frameCount = Math.round((duration / 1_000_000) * fps);
+                          if (frameCount % 2 !== 0) frameCount += 1;
+                          duration = Math.round((frameCount / fps) * 1_000_000);
+
                           await studio.addTransition(
                             transitionKey,
-                            2_000_000,
+                            duration,
                             junction.clipA.id,
                             junction.clipB.id,
                           );
+                          // Update to guarantee correct crossfade sync
+                          const latestClips = useTimelineStore.getState().clips;
+                          const transitionArray = Object.values(latestClips).filter(
+                            (c: any) =>
+                              c.type === "Transition" &&
+                              c.fromClipId === junction.clipA.id &&
+                              c.toClipId === junction.clipB.id,
+                          );
+                          if (transitionArray.length > 0) {
+                            const tClip = transitionArray[transitionArray.length - 1];
+                            const cA = latestClips[junction.clipA.id];
+                            const cB = latestClips[junction.clipB.id];
+                            if (cA && cB) {
+                              await (studio as any).updateTransition(tClip.id, {
+                                duration: duration,
+                                fromClipDurationMicro:
+                                  (cA.sourceDuration || cA.duration) - duration / 2,
+                                toClipDurationMicro:
+                                  (cB.sourceDuration || cB.duration) - duration / 2,
+                              });
+                            }
+                          }
                         }
                       }
                     }
@@ -660,7 +726,7 @@ export function Timeline() {
                 </ContextMenuContent>
               )}
             </ContextMenu>
-            <TimelineClipMenu timelineCanvas={canvasInstance} />
+            {/* <TimelineClipMenu timelineCanvas={canvasInstance} /> */}
           </div>
         </div>
       </div>

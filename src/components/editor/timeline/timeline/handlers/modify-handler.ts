@@ -29,11 +29,21 @@ function updateClipTimeLocally(timeline: Timeline, clipId: string, newDisplayFro
 
 export function handleTrackRelocation(timeline: Timeline, options: any) {
   const target = options.target as FabricObject | undefined;
-  if (!target) return;
+  if (!target || (target as any).isTransitionClip || target.type === "Transition") return;
 
   clearAuxiliaryObjects(timeline.canvas, timeline.canvas.getObjects());
 
   const targetAny = target as any;
+  const clipId = targetAny.elementId;
+
+  // Identify transitions involving this clip; relocation breaks them
+  const transitionsToDelete = clipId
+    ? Object.values(timeline.clipsMap)
+        .filter(
+          (c: any) => c.type === "Transition" && (c.fromClipId === clipId || c.toClipId === clipId),
+        )
+        .map((c) => c.id)
+    : [];
 
   // ---------------------------------------------------------
   // 1. Handle Drop on Separator (Single Clip Only - Reverted Multi-clip)
@@ -47,9 +57,8 @@ export function handleTrackRelocation(timeline: Timeline, options: any) {
       return;
     }
 
-    if (targetAny.elementId) {
+    if (clipId) {
       const index = timeline.activeSeparatorIndex;
-      const clipId = targetAny.elementId;
 
       const tracks = timeline.tracks;
       const currentTrackIndex = tracks.findIndex((t) => t.clipIds.includes(clipId));
@@ -102,10 +111,12 @@ export function handleTrackRelocation(timeline: Timeline, options: any) {
 
       const newTracksList = tracks
         .map((t) => {
-          if (affectedTrackIds.has(t.id)) {
+          const isFilterNeeded =
+            affectedTrackIds.has(t.id) || t.clipIds.some((id) => transitionsToDelete.includes(id));
+          if (isFilterNeeded) {
             return {
               ...t,
-              clipIds: t.clipIds.filter((id) => id !== clipId),
+              clipIds: t.clipIds.filter((id) => id !== clipId && !transitionsToDelete.includes(id)),
             };
           }
           return t;
@@ -117,6 +128,10 @@ export function handleTrackRelocation(timeline: Timeline, options: any) {
       timeline.setTracksInternal(newTracksList);
       timeline.render();
       timeline.emit("timeline:updated", { tracks: newTracksList });
+
+      if (transitionsToDelete.length > 0) {
+        timeline.emit("clips:removed", { clipIds: transitionsToDelete });
+      }
 
       // Also emit clip modification to save time?
       // Yes
@@ -176,6 +191,9 @@ export function handleTrackRelocation(timeline: Timeline, options: any) {
           const otherClip = timeline.clipsMap[otherClipId];
           if (!otherClip) continue;
 
+          // Transitions naturally overlap with clips they connect; ignore them in collision detection
+          if (otherClip.type === "Transition") continue;
+
           // Check for actual overlap: clips overlap if one starts before the other ends
           // and ends after the other starts
           const otherStart = otherClip.display.from;
@@ -221,7 +239,7 @@ export function handleTrackRelocation(timeline: Timeline, options: any) {
         const newTracksList = currentTracks
           .map((t: ITimelineTrack) => ({
             ...t,
-            clipIds: t.clipIds.filter((id) => id !== clipId),
+            clipIds: t.clipIds.filter((id) => id !== clipId && !transitionsToDelete.includes(id)),
           }))
           .filter((t: ITimelineTrack) => t.clipIds.length > 0);
 
@@ -235,6 +253,10 @@ export function handleTrackRelocation(timeline: Timeline, options: any) {
 
         timeline.emit("timeline:updated", { tracks: newTracksList });
 
+        if (transitionsToDelete.length > 0) {
+          timeline.emit("clips:removed", { clipIds: transitionsToDelete });
+        }
+
         const trim = targetAny.trim;
         timeline.emit("clip:modified", {
           clipId,
@@ -244,6 +266,21 @@ export function handleTrackRelocation(timeline: Timeline, options: any) {
         });
       } else {
         // --- NO OVERLAP: MOVE ---
+        const currentTrack = timeline.tracks.find((t) => t.clipIds.includes(clipId));
+        if (currentTrack && currentTrack.id !== trackRegion.id) {
+          if (transitionsToDelete.length > 0) {
+            const newTracksList = timeline.tracks
+              .map((t) => ({
+                ...t,
+                clipIds: t.clipIds.filter((id) => !transitionsToDelete.includes(id)),
+              }))
+              .filter((t) => t.clipIds.length > 0);
+
+            timeline.setTracksInternal(newTracksList);
+            timeline.emit("clips:removed", { clipIds: transitionsToDelete });
+          }
+        }
+
         target.set("top", trackRegion.top);
         target.setCoords();
         timeline.emit("clip:movedToTrack", {

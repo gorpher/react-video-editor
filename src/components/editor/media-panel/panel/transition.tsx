@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useStudioStore } from "@/stores/studio-store";
 import { getTransitionOptions, registerCustomTransition } from "openvideo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
+import { Icons } from "@/components/shared/icons";
 
 const TRANSITION_DURATION_DEFAULT = 2_000_000;
 
@@ -45,60 +47,108 @@ const TransitionCard = ({
   badge,
 }: TransitionCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
+  const [dragState, setDragState] = useState<{
+    x: number;
+    y: number;
+    overTimeline: boolean;
+  } | null>(null);
 
   return (
-    <div
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData("text/plain", effectKey);
-        e.dataTransfer.setData("type", "transition");
-      }}
-      className="flex w-full items-center gap-2 flex-col group cursor-pointer"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      onClick={onClick}
-    >
-      <div className="relative w-full aspect-video rounded-md bg-input/30 border overflow-hidden">
-        {previewStatic || previewDynamic ? (
-          <>
-            {previewStatic && (
-              <img
-                src={previewStatic}
-                loading="lazy"
-                className="
+    <>
+      <div
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData("text/plain", effectKey);
+          e.dataTransfer.setData("type", "transition");
+          const img = new Image();
+          img.src =
+            "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+          e.dataTransfer.setDragImage(img, 0, 0);
+          setDragState({ x: e.clientX, y: e.clientY, overTimeline: false });
+        }}
+        onDrag={(e) => {
+          if (e.clientX === 0 && e.clientY === 0) return;
+          const elements = document.elementsFromPoint(e.clientX, e.clientY);
+          const overTimeline = elements.some((el) => el.id === "timeline-canvas");
+          setDragState({ x: e.clientX, y: e.clientY, overTimeline });
+        }}
+        onDragEnd={() => setDragState(null)}
+        className="flex w-full items-center gap-2 flex-col group cursor-pointer"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onClick={onClick}
+      >
+        <div className="relative w-full aspect-video rounded-md bg-input/30 border overflow-hidden">
+          {previewStatic || previewDynamic ? (
+            <>
+              {previewStatic && (
+                <img
+                  src={previewStatic}
+                  loading="lazy"
+                  className="
             absolute inset-0 w-full h-full object-cover rounded-sm
             transition-opacity duration-150
             opacity-100 group-hover:opacity-0
           "
-              />
-            )}
+                />
+              )}
 
-            {isHovered && previewDynamic && (
-              <img
-                src={previewDynamic}
-                className="
+              {isHovered && previewDynamic && (
+                <img
+                  src={previewDynamic}
+                  className="
               absolute inset-0 w-full h-full object-cover rounded-sm
               transition-opacity duration-150
               opacity-0 group-hover:opacity-100
             "
-              />
-            )}
-          </>
-        ) : (
-          <div className="text-xs text-muted-foreground text-center px-2 bg-primary/40 h-full w-full"></div>
-        )}
+                />
+              )}
+            </>
+          ) : (
+            <div className="text-xs text-muted-foreground text-center px-2 bg-primary/40 h-full w-full"></div>
+          )}
 
-        {badge && (
-          <div className="absolute top-1 right-1 bg-primary/80 text-primary-foreground text-[9px] font-semibold px-1.5 py-0.5 rounded-full leading-none">
-            {badge}
+          {badge && (
+            <div className="absolute top-1 right-1 bg-primary/80 text-primary-foreground text-[9px] font-semibold px-1.5 py-0.5 rounded-full leading-none">
+              {badge}
+            </div>
+          )}
+
+          <div className="absolute bottom-0 left-0 w-full p-2 bg-gradient-to-t from-black/80 to-transparent text-white text-xs font-medium truncate text-center transition-opacity duration-150 group-hover:opacity-0">
+            {label}
           </div>
-        )}
-
-        <div className="absolute bottom-0 left-0 w-full p-2 bg-gradient-to-t from-black/80 to-transparent text-white text-xs font-medium truncate text-center transition-opacity duration-150 group-hover:opacity-0">
-          {label}
         </div>
       </div>
-    </div>
+
+      {dragState &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              left: dragState.x + 15,
+              top: dragState.y + 15,
+              pointerEvents: "none",
+              zIndex: 99999,
+            }}
+          >
+            {dragState.overTimeline ? (
+              <div className="w-12 h-12 bg-black rounded flex items-center justify-center opacity-90 shadow-lg">
+                <Icons.transition className="text-white w-6 h-6" />
+              </div>
+            ) : (
+              <div className="w-20 aspect-video rounded-md bg-input/80 border overflow-hidden shadow-xl">
+                {previewStatic && (
+                  <img src={previewStatic} className="w-full h-full object-cover rounded-sm" />
+                )}
+                <div className="absolute bottom-0 left-0 w-full p-1 bg-gradient-to-t from-black/80 to-transparent text-white text-[10px] font-medium truncate text-center">
+                  {label}
+                </div>
+              </div>
+            )}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 };
 

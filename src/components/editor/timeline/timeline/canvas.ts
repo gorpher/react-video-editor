@@ -244,10 +244,12 @@ class Timeline extends EventEmitter<TimelineCanvasEvents> {
 
     if (junction) {
       if (showPlaceholder) {
+        const width = this.getProportionalTransitionWidth(junction.clipA, junction.clipB);
         this.showTransitionPlaceholder(
           junction.x,
           junction.track.top + (junction.track.bottom - junction.track.top) / 2,
           junction.trackId,
+          width,
         );
       }
       return {
@@ -302,16 +304,30 @@ class Timeline extends EventEmitter<TimelineCanvasEvents> {
     const junction = this.getJunctionAt(x, y);
 
     if (junction) {
+      const width = this.getProportionalTransitionWidth(junction.clipA, junction.clipB);
       this.showTransitionButton(
         junction.x,
         junction.track.top + (junction.track.bottom - junction.track.top) / 2,
         junction.clipA.id,
         junction.clipB.id,
         junction.trackId,
+        width,
       );
     } else {
       this.clearTransitionButton();
     }
+  }
+
+  private getProportionalTransitionWidth(clipA: IClip, clipB: IClip): number {
+    const minDuration = Math.min(clipA.duration || 0, clipB.duration || 0);
+    // Transition duration is 25% of the shortest clip
+    const transitionDurationUs = minDuration * 0.25;
+
+    return (
+      (transitionDurationUs / MICROSECONDS_PER_SECOND) *
+      TIMELINE_CONSTANTS.PIXELS_PER_SECOND *
+      this.#timeScale
+    );
   }
 
   private getJunctionAt(
@@ -492,12 +508,14 @@ class Timeline extends EventEmitter<TimelineCanvasEvents> {
     clipAId: string,
     clipBId: string,
     trackId: string,
+    width: number,
   ) {
     if (this.#transitionButton) {
-      // If already showing for these clips, just move it if needed (though it shouldn't move much)
+      // If already showing for these clips, just move it if needed
       if (
         (this.#transitionButton as any).clipAId === clipAId &&
-        (this.#transitionButton as any).clipBId === clipBId
+        (this.#transitionButton as any).clipBId === clipBId &&
+        Math.abs(this.#transitionButton.width - width) < 0.1
       ) {
         this.#transitionButton.set({ left: x, top: y });
         this.#transitionButton.setCoords();
@@ -507,9 +525,14 @@ class Timeline extends EventEmitter<TimelineCanvasEvents> {
       this.clearTransitionButton();
     }
 
+    const track = this.#tracks.find((t) => t.id === trackId);
+    const height = track ? getTrackHeight(track.type as any) : 52;
+
     this.#transitionButton = new TransitionButton({
       left: x,
       top: y,
+      width: width,
+      height: height,
       onClick: () => {
         this.emit("transition:add", {
           fromClipId: clipAId,
@@ -527,13 +550,16 @@ class Timeline extends EventEmitter<TimelineCanvasEvents> {
     this.canvas.requestRenderAll();
   }
 
-  public showTransitionPlaceholder(x: number, y: number, trackId: string) {
+  public showTransitionPlaceholder(x: number, y: number, trackId: string, width: number) {
     const track = this.#tracks.find((t) => t.id === trackId);
     const height = track ? getTrackHeight(track.type as any) : 52;
 
     if (this.#transitionPlaceholder) {
-      // If height changed, we're better off recreating for simplicity with the Group structure
-      if ((this.#transitionPlaceholder as any).trackId !== trackId) {
+      // If height or width changed, we're better off recreating for simplicity
+      if (
+        (this.#transitionPlaceholder as any).trackId !== trackId ||
+        Math.abs(this.#transitionPlaceholder.width - width) > 0.1
+      ) {
         this.clearTransitionButton();
       } else {
         this.#transitionPlaceholder.set({ left: x, top: y });
@@ -547,6 +573,7 @@ class Timeline extends EventEmitter<TimelineCanvasEvents> {
       left: x,
       top: y,
       height: height,
+      width: width,
     });
     (this.#transitionPlaceholder as any).trackId = trackId;
 
@@ -873,7 +900,7 @@ class Timeline extends EventEmitter<TimelineCanvasEvents> {
       const region = this.#trackRegions[trackIndex];
       const trackHeight = region.bottom - region.top;
 
-      trackData.clipIds.forEach((clipId) => {
+      trackData.clipIds.forEach((clipId, i) => {
         usedClipIds.add(clipId);
         const clip = this.#clipsMap[clipId];
         if (!clip) return;
@@ -933,8 +960,8 @@ class Timeline extends EventEmitter<TimelineCanvasEvents> {
               elementId: clip.id,
               text: clipName,
               src: clip.src,
-              lockMovementX: !!clip.locked,
-              lockMovementY: !!clip.locked,
+              lockMovementX: clip.type === "Transition" ? true : !!clip.locked,
+              lockMovementY: clip.type === "Transition" ? true : !!clip.locked,
               lockScalingX: !!clip.locked,
               lockScalingY: !!clip.locked,
               lockSkewingX: !!clip.locked,
@@ -954,6 +981,17 @@ class Timeline extends EventEmitter<TimelineCanvasEvents> {
               timelineClip = new Effect(commonProps);
             } else if (clip.type === "Transition") {
               timelineClip = new Transition(commonProps);
+
+              // Calculate max duration as 25% of shortest neighbor
+              const prevClipId = (clip as any).fromClipId;
+              const nextClipId = (clip as any).toClipId;
+              const prevClip = prevClipId ? this.#clipsMap[prevClipId] : null;
+              const nextClip = nextClipId ? this.#clipsMap[nextClipId] : null;
+
+              if (prevClip && nextClip) {
+                const minDuration = Math.min(prevClip.duration, nextClip.duration);
+                (timelineClip as any).maxTransitionDurationUs = minDuration * 0.25;
+              }
             } else if (clip.type === "Caption") {
               timelineClip = new Caption(commonProps);
             } else {
@@ -983,8 +1021,8 @@ class Timeline extends EventEmitter<TimelineCanvasEvents> {
               height: trackHeight,
               text: clipName,
               src: clip.src,
-              lockMovementX: !!clip.locked,
-              lockMovementY: !!clip.locked,
+              lockMovementX: clip.type === "Transition" ? true : !!clip.locked,
+              lockMovementY: clip.type === "Transition" ? true : !!clip.locked,
               lockScalingX: !!clip.locked,
               lockScalingY: !!clip.locked,
               lockSkewingX: !!clip.locked,
@@ -1004,6 +1042,18 @@ class Timeline extends EventEmitter<TimelineCanvasEvents> {
               studioClipId: clip.id,
             };
 
+            if (clip.type === "Transition") {
+              const prevClipId = (clip as any).fromClipId;
+              const nextClipId = (clip as any).toClipId;
+              const prevClip = prevClipId ? this.#clipsMap[prevClipId] : null;
+              const nextClip = nextClipId ? this.#clipsMap[nextClipId] : null;
+
+              if (prevClip && nextClip) {
+                const minDuration = Math.min(prevClip.duration, nextClip.duration);
+                (timelineClip as any).maxTransitionDurationUs = minDuration * 0.25;
+              }
+            }
+
             if (timelineClip.group) {
               const group = timelineClip.group;
               props.left = startX - (group.left || 0) - (group.width || 0) / 2;
@@ -1015,6 +1065,19 @@ class Timeline extends EventEmitter<TimelineCanvasEvents> {
           }
           // (timelineClip as FabricObject).
           this.canvas.bringObjectToFront(timelineClip);
+        }
+      });
+    });
+
+    // --- PASS 4: BRING TRANSITIONS TO FRONT ---
+    this.#tracks.forEach((trackData) => {
+      trackData.clipIds.forEach((clipId) => {
+        const clip = this.#clipsMap[clipId];
+        if (clip && clip.type === "Transition") {
+          const timelineClip = this.#clipObjects.get(clipId);
+          if (timelineClip) {
+            this.canvas.bringObjectToFront(timelineClip);
+          }
         }
       });
     });
