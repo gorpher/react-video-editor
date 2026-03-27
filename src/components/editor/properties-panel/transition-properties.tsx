@@ -168,7 +168,7 @@ export function TransitionProperties({ clip }: TransitionPropertiesProps) {
                   x: e.clientX,
                   y: e.clientY,
                   overTimeline: false,
-                  effect, // 👈 guardamos el effect activo
+                  effect,
                 });
               }}
               onDrag={(e) => {
