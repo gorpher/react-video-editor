@@ -63,6 +63,7 @@ export default function EditProjectPage() {
                   } as any);
                 }
               }
+            }
           }
         } catch (err) {
           console.warn("Failed to pre-register custom presets", err);
