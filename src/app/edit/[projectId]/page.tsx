@@ -12,6 +12,7 @@ export default function EditProjectPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.projectId as string;
+
   const [isLoaded, setIsLoaded] = useState(false);
   const loadedProjectRef = useRef<string | null>(null);
 
@@ -30,15 +31,8 @@ export default function EditProjectPage() {
           return;
         }
 
-        // Initialize project store
         const projectStore = useProjectStore.getState();
-        projectStore.setCanvasSize(project.canvasSize, project.canvasMode || "preset");
-        if (project.fps) {
-          projectStore.setFps(project.fps);
-        }
 
-        // Register the user's custom effects & transitions before loading the
-        // project JSON so the studio can resolve any custom shader keys it finds.
         try {
           const sessionRes: any = await authClient.getSession();
           const session = sessionRes?.data ?? sessionRes;
@@ -69,19 +63,22 @@ export default function EditProjectPage() {
                   } as any);
                 }
               }
-            }
           }
         } catch (err) {
           console.warn("Failed to pre-register custom presets", err);
         }
 
-        // Use the data field from the project model in the DB
-        if (project.data) {
-          projectStore.setInitialStudioJSON(project.data);
-        } else {
-          // Reset if not found
-          projectStore.setInitialStudioJSON(null);
+        projectStore.setCanvasSize(project.canvasSize, project.canvasMode || "preset");
+
+        if (project.fps) {
+          projectStore.setFps(project.fps);
         }
+
+        if (project.name) {
+          projectStore.setProjectName(project.name);
+        }
+
+        projectStore.setInitialStudioJSON(project.data || null);
       } catch (err) {
         console.error("Failed to load project", err);
       } finally {
@@ -92,14 +89,18 @@ export default function EditProjectPage() {
     loadProjectData();
   }, [projectId, router]);
 
-  if (!isLoaded) {
-    return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-background text-foreground">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-muted-foreground animate-pulse">Loading project...</p>
-      </div>
-    );
-  }
+  return (
+    <>
+      {!isLoaded && (
+        <div className="h-screen w-screen flex flex-col items-center justify-center bg-background text-foreground absolute z-10">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p className="text-muted-foreground animate-pulse">Loading project...</p>
+        </div>
+      )}
 
-  return <Editor />;
+      <div style={{ visibility: isLoaded ? "visible" : "hidden" }}>
+        <Editor />
+      </div>
+    </>
+  );
 }

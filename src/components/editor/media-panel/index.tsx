@@ -49,6 +49,7 @@ export function MediaPanel() {
 
     const handleClear = () => {
       setSelectedClips([]);
+      setStudioSelectedClips([]);
       setShowProperties(false);
     };
 

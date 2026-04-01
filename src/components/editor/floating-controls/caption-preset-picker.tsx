@@ -57,6 +57,10 @@ const CaptionPresetPicker = () => {
       preset.preservedColorKeyWord = false;
     }
 
+    if (preset.fontSize === undefined) {
+      preset.fontSize = 64;
+    }
+
     // Load fonts if needed
     if (preset.fontFamily && preset.fontUrl) {
       await fontManager.addFont({
@@ -74,6 +78,7 @@ const CaptionPresetPicker = () => {
       stroke: preset.borderColor,
       fontFamily: preset.fontFamily,
       fontUrl: preset.fontUrl,
+      fontSize: preset.fontSize,
       align: preset.textAlign as any,
       caption: {
         colors: {
@@ -95,6 +100,7 @@ const CaptionPresetPicker = () => {
         angle: Math.PI / 4,
       },
       wordAnimation: preset.wordAnimation,
+      textBoxStyle: preset.textBoxStyle,
     };
 
     // Apply to all selected caption clips and other clips with the same mediaId
@@ -116,7 +122,8 @@ const CaptionPresetPicker = () => {
           studio,
           captionClip: clip,
           mode: "single",
-          fontSize: (clip as any).originalOpts?.fontSize,
+          fontSize:
+            preset.fontSize === undefined ? (clip as any).originalOpts?.fontSize : preset.fontSize,
           fontFamily: preset.fontFamily,
           fontUrl: preset.fontUrl,
           styleUpdate: styleUpdate,
@@ -128,7 +135,8 @@ const CaptionPresetPicker = () => {
           studio,
           captionClip: clip,
           mode: "multiple",
-          fontSize: (clip as any).originalOpts?.fontSize,
+          fontSize:
+            preset.fontSize === undefined ? (clip as any).originalOpts?.fontSize : preset.fontSize,
           fontFamily: preset.fontFamily,
           fontUrl: preset.fontUrl,
           styleUpdate: styleUpdate,

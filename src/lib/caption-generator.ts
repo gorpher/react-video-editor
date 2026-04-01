@@ -44,6 +44,9 @@ export async function generateCaptionClips(options: CaptionClipOptions): Promise
       height: height || fontSize,
     };
   };
+  const maxLines = options.style?.textBoxStyle?.maxLines ?? 1;
+  const verticalPadding = options.style?.textBoxStyle?.verticalPadding ?? 0;
+
   if (mode === "single") {
     // Each word is a chunk
     captionChunks = words.map((word) => {
@@ -72,10 +75,19 @@ export async function generateCaptionClips(options: CaptionClipOptions): Promise
       };
     });
   } else {
-    captionChunks = groupWordsByWidth(words, maxCaptionWidth, fontSize, fontFamily);
+    captionChunks = groupWordsByWidth(words, maxCaptionWidth, fontSize, fontFamily, maxLines);
   }
 
   const clips: any[] = [];
+
+  const maxCaptionHeight = captionChunks.reduce((max, chunk) => {
+    const jumpLines = (chunk.text.match(/\r?\n/g) || []).length;
+
+    const captionHeight =
+      Math.ceil(chunk.height) + (jumpLines + 1) * verticalPadding * 2 + 14 * (jumpLines + 1);
+
+    return Math.max(max, captionHeight);
+  }, 0);
 
   for (const chunk of captionChunks) {
     const chunkFromMs = chunk.from * 1000; // seconds to ms
@@ -87,9 +99,11 @@ export async function generateCaptionClips(options: CaptionClipOptions): Promise
     const durationUs = chunkDurationMs * 1000;
 
     // Use actual measured dimensions from chunk, with padding
-    const captionWidth = Math.ceil(chunk.width) + (mode === "single" ? 60 : 100);
-    const captionHeight = Math.ceil(chunk.height) + 20;
-
+    const captionWidth = Math.ceil(chunk.width) + (mode === "single" ? 60 : 0);
+    const jumpLines = (chunk.text.match(/\r?\n/g) || []).length;
+    const captionHeight =
+      Math.ceil(chunk.height) + (jumpLines + 1) * verticalPadding * 2 + 14 * (jumpLines + 1);
+    const captionBottomPadding = 450 - (maxCaptionHeight - captionHeight) / 2;
     clips.push({
       type: "Caption",
       src: "",
@@ -105,7 +119,7 @@ export async function generateCaptionClips(options: CaptionClipOptions): Promise
           ? 80
           : options.style?.verticalAlign === "center"
             ? (videoHeight - captionHeight) / 2
-            : videoHeight - captionHeight - 80,
+            : videoHeight - captionBottomPadding,
       width: captionWidth,
       height: captionHeight,
       angle: 0,

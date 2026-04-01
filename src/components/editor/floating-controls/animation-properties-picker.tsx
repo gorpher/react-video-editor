@@ -65,7 +65,7 @@ export function AnimationPropertiesPicker() {
   });
   const [delay, setDelay] = useState<number>((animation?.options.delay || 0) / 1000);
   const [iterCount, setIterCount] = useState<number>(animation?.options.iterCount || 1);
-  const [easing, setEasing] = useState<string>((animation?.options.easing as string) || "");
+  const [easing, setEasing] = useState<string>((animation?.options.easing as string) || "linear");
   const [mirrorEnabled, setMirrorEnabled] = useState<boolean>(false);
 
   // Initialize from animation
@@ -363,6 +363,49 @@ export function AnimationPropertiesPicker() {
     { label: "脉冲", value: "pulse" },
   ];
 
+  const comboPresets = [
+    { label: "Combo Zoom 1", value: "comboZoom1" },
+    { label: "Combo Zoom 2", value: "comboZoom2" },
+    { label: "Combo Pendulum 1", value: "comboPendulum1" },
+    { label: "Combo Pendulum 2", value: "comboPendulum2" },
+    { label: "Combo Right Distort", value: "comboRightDistort" },
+    { label: "Combo Left Distort", value: "comboLeftDistort" },
+    { label: "Combo Wobble", value: "comboWobble" },
+    { label: "Combo Spinning Top 1", value: "comboSpinningTop1" },
+    { label: "Combo Spinning Top 2", value: "comboSpinningTop2" },
+    { label: "Combo Sway Out", value: "comboSwayOut" },
+    { label: "Combo Bounce 1", value: "comboBounce1" },
+    { label: "Combo Sway In", value: "comboSwayIn" },
+  ];
+
+  useEffect(() => {
+    let newDuration = 1000;
+    let mirror = false;
+    if (activeTab === "combo") {
+      newDuration = clipDuration / 1000;
+      mirror = true;
+    } else {
+      if (animation?.options?.duration) {
+        newDuration = animation.options.duration / 1000;
+      } else if (typeClip === "Caption") {
+        newDuration = (clipDuration * 0.2) / 1000;
+      }
+      if (animation?.params) {
+        mirror = Object.values(animation.params as KeyframeData).some(
+          (p: any) => p && p.mirror > 0,
+        );
+      }
+    }
+    setDuration(newDuration);
+    setMirrorEnabled(mirror);
+  }, [clipDuration, activeTab, animation, typeClip]);
+
+  useEffect(() => {
+    const hasProperties = Object.values(keyframes).some((frame) => Object.keys(frame).length > 0);
+
+    console.log(hasProperties);
+  }, [keyframes]);
+
   return (
     <div
       ref={containerRef}
@@ -390,6 +433,7 @@ export function AnimationPropertiesPicker() {
                 activeTab={activeTab}
                 inPresets={inPresets}
                 outPresets={outPresets}
+                comboPresets={comboPresets}
                 handlePresetChange={handlePresetChange}
               />
               <EasingOptions easing={easing} setEasing={setEasing} />
@@ -409,6 +453,7 @@ export function AnimationPropertiesPicker() {
                   activeTab={activeTab}
                   inPresets={inPresets}
                   outPresets={outPresets}
+                  comboPresets={comboPresets}
                   handlePresetChange={handlePresetChange}
                 />
 
@@ -578,6 +623,10 @@ export function AnimationPropertiesPicker() {
               <Button
                 onClick={typeClip === "Caption" ? handleApplyToAllCaptions : handleSave}
                 className="flex-1"
+                disabled={
+                  !preset &&
+                  !Object.values(keyframes).some((frame) => Object.keys(frame).length > 0)
+                }
               >
                 {mode === "add" ? "添加" : "保存"}
               </Button>
@@ -717,12 +766,14 @@ const PresetOptions = ({
   activeTab,
   inPresets,
   outPresets,
+  comboPresets,
   handlePresetChange,
 }: {
   preset: string;
   activeTab: string;
   inPresets: { label: string; value: string }[];
   outPresets: { label: string; value: string }[];
+  comboPresets: { label: string; value: string }[];
   handlePresetChange: (preset: string) => void;
 }) => {
   return (

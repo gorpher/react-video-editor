@@ -21,15 +21,16 @@ export const fetchCaptionData = async (url: string): Promise<any> => {
  * Groups words by width using canvas text measurement
  * Words are accumulated until the text width exceeds maxWidth, then a new caption is created
  */
+
 export const groupWordsByWidth = (
   words: any[],
   maxWidth: number = 800,
   fontSize: number = 80,
   fontFamily: string = "Bangers-Regular",
+  maxLines: number = 1,
 ): any[] => {
   if (!words || words.length === 0) return [];
 
-  // Create canvas for text measurement
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
   if (!ctx) return [];
@@ -38,69 +39,75 @@ export const groupWordsByWidth = (
 
   const captions: any[] = [];
   let currentWords: any[] = [];
-  let currentText = "";
-  let currentWidth = 0;
 
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    const wordText = word.word || word.text || "";
+  let lines: string[] = [""];
+  let currentLineCount = 1;
+  let lastCommaIndex = -1;
 
-    // Calculate width if we add this word
-    const testText = currentText ? `${currentText} ${wordText}` : wordText;
-    const bitmapText = new PIXI.BitmapText(testText, {
-      fontFamily,
-      fontSize,
-    });
-    const testWidth = bitmapText.width + 160;
+  const getCurrentText = () => lines.join("\n");
 
-    if (testWidth > maxWidth && currentWords.length > 0) {
-      // Width exceeded, create caption with current words
-      const firstWord = currentWords[0];
-      const lastWord = currentWords[currentWords.length - 1];
+  const measureTextWidth = (text: string): number => {
+    const metrics = ctx.measureText(text);
+    let width = metrics.width;
 
-      // Measure actual height of the text
-      const metrics = ctx.measureText("AaFfLMZpPqQ");
-      const textHeight = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
-
-      captions.push({
-        text: currentText,
-        width: currentWidth, // Actual measured width
-        height: textHeight || fontSize, // Actual measured height, fallback to fontSize
-        words: currentWords.map((w, idx) => ({
-          text: w.word || w.text || "",
-          from: idx === 0 ? 0 : (w.start - firstWord.start) * 1000, // Relative to caption start in ms
-          to: (w.end - firstWord.start) * 1000, // Relative to caption start in ms
-          isKeyWord: idx === 0 || idx === currentWords.length - 1, // First and last words are keywords
-          paragraphIndex: w.paragraphIndex ?? "",
-        })),
-        from: firstWord.start, // In seconds
-        to: lastWord.end, // In seconds
-      });
-      // Start new caption with current word
-      currentWords = [word];
-      currentText = wordText;
-      currentWidth = ctx.measureText(wordText).width;
-    } else {
-      // Add word to current caption
-      currentWords.push(word);
-      currentText = testText;
-      currentWidth = testWidth;
+    const punctuationMatches = text.match(/[.,!?;:]/g);
+    if (punctuationMatches) {
+      width += punctuationMatches.length * 4;
     }
-  }
 
-  // Add remaining words as final caption
-  if (currentWords.length > 0) {
+    return width;
+  };
+
+  const rebuildLines = (words: any[]) => {
+    const newLines: string[] = [];
+    let tempLine = "";
+
+    for (const w of words) {
+      const text = w.word || w.text;
+      const test = tempLine ? `${tempLine} ${text}` : text;
+
+      if (measureTextWidth(test) + 160 > maxWidth) {
+        newLines.push(tempLine);
+        tempLine = text;
+      } else {
+        tempLine = test;
+      }
+    }
+
+    if (tempLine) newLines.push(tempLine);
+
+    return newLines;
+  };
+
+  const finalizeCaption = () => {
+    if (currentWords.length === 0) return;
+
+    const currentText = getCurrentText();
+
     const firstWord = currentWords[0];
     const lastWord = currentWords[currentWords.length - 1];
 
-    // Measure actual height of the text
     const metrics = ctx.measureText("AaFfLMZpPqQ");
-    const textHeight = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+    const singleLineHeight =
+      metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent || fontSize;
+
+    const totalHeight = singleLineHeight * currentLineCount;
+
+    let maxW = 0;
+    const widthSpace = ctx.measureText(" ").width + 2;
+
+    lines.forEach((line) => {
+      const width = measureTextWidth(line);
+      maxW = Math.max(maxW, width);
+    });
+
+    const wordsLine = lines[0].split(" ");
+    const totalWidth = maxW + (wordsLine.length + 1) * widthSpace;
 
     captions.push({
       text: currentText,
-      width: currentWidth, // Actual measured width
-      height: textHeight || fontSize, // Actual measured height, fallback to fontSize
+      width: totalWidth,
+      height: totalHeight,
       words: currentWords.map((w, idx) => ({
         text: w.word || w.text || "",
         from: idx === 0 ? 0 : (w.start - firstWord.start) * 1000,
@@ -111,7 +118,125 @@ export const groupWordsByWidth = (
       from: firstWord.start,
       to: lastWord.end,
     });
+  };
+
+  const resetBlock = () => {
+    currentWords = [];
+    lines = [""];
+    currentLineCount = 1;
+    lastCommaIndex = -1;
+  };
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    const wordText = word.word || word.text || "";
+
+    const endsWithPeriod = /[.!?]$/.test(wordText);
+    const endsWithComma = /[,;:]$/.test(wordText);
+
+    const currentLine = lines[lines.length - 1];
+
+    const testLineText = currentLine ? `${currentLine} ${wordText}` : wordText;
+
+    const testLineWidth = measureTextWidth(testLineText) + 160;
+
+    const isOverflowing = testLineWidth > maxWidth;
+
+    if (isOverflowing && currentLine !== "") {
+      // Intentar cortar en coma si existe
+      if (lastCommaIndex !== -1) {
+        const wordsBeforeComma = currentWords.slice(0, lastCommaIndex + 1);
+        const wordsAfterComma = currentWords.slice(lastCommaIndex + 1);
+
+        // cerrar caption antes de coma
+        currentWords = wordsBeforeComma;
+        lines = rebuildLines(wordsBeforeComma);
+        currentLineCount = lines.length;
+        finalizeCaption();
+
+        // reiniciar con lo que sigue
+        currentWords = [...wordsAfterComma, word];
+        lines = [currentWords.map((w) => w.word || w.text).join(" ")];
+        currentLineCount = 1;
+
+        lastCommaIndex = -1;
+
+        if (endsWithPeriod) {
+          finalizeCaption();
+          resetBlock();
+        } else if (endsWithComma) {
+          lastCommaIndex = currentWords.length - 1;
+        }
+
+        continue;
+      }
+
+      if (currentLineCount < maxLines) {
+        const currentLineWords = lines[lines.length - 1].split(" ");
+
+        const lastWordFromLine = currentLineWords.pop();
+
+        if (lastWordFromLine) {
+          lines[lines.length - 1] = currentLineWords.join(" ");
+
+          const newLine = lastWordFromLine;
+          lines.push(newLine);
+          currentLineCount++;
+
+          const updatedNewLine = `${lines[lines.length - 1]} ${wordText}`;
+          lines[lines.length - 1] = updatedNewLine;
+          currentWords.push(word);
+        } else {
+          lines.push(wordText);
+          currentLineCount++;
+          currentWords.push(word);
+        }
+
+        if (endsWithPeriod) {
+          finalizeCaption();
+          resetBlock();
+          continue;
+        }
+
+        if (endsWithComma) {
+          lastCommaIndex = currentWords.length - 1;
+        }
+      } else {
+        finalizeCaption();
+        resetBlock();
+
+        currentWords = [word];
+        lines = [wordText];
+        currentLineCount = 1;
+
+        if (endsWithPeriod) {
+          finalizeCaption();
+          resetBlock();
+          continue;
+        }
+
+        if (endsWithComma) {
+          lastCommaIndex = currentWords.length - 1;
+        }
+      }
+
+      continue;
+    }
+
+    lines[lines.length - 1] = testLineText;
+    currentWords.push(word);
+
+    if (endsWithComma) {
+      lastCommaIndex = currentWords.length - 1;
+    }
+
+    if (endsWithPeriod) {
+      finalizeCaption();
+      resetBlock();
+    }
   }
+
+  finalizeCaption();
 
   return captions;
 };
@@ -273,7 +398,7 @@ export const convertSchemaToExported = async (schemaJson: any): Promise<any> => 
             const words = captionData.results.main.words;
 
             // Group words by width
-            const captionChunks = groupWordsByWidth(words, 800, 80, "Bangers-Regular");
+            const captionChunks = groupWordsByWidth(words, 800, 80, "Bangers-Regular", 1);
 
             // Create Caption clips for each chunk
             for (const chunk of captionChunks) {

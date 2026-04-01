@@ -65,10 +65,13 @@ export function TimelineToolbar({
   onAddTrack?: (trackType: QuickTrackType) => void;
 }) {
   const { currentTime, duration, isPlaying, toggle, seek } = usePlaybackStore();
-  const { studio } = useStudioStore();
+  const { studio, selectedClips } = useStudioStore();
   const [isOriginalAudioMuted, setIsOriginalAudioMuted] = useState(false);
   const [isTogglingOriginalAudio, setIsTogglingOriginalAudio] = useState(false);
   const originalVolumeByClipIdRef = useRef<Map<string, number>>(new Map());
+
+  const isSelected = selectedClips.length > 0;
+  const isLocked = selectedClips.some((clip) => clip.locked);
 
   const getVideoClips = () => {
     const studioClips = (((studio as any)?.clips || []) as any[]).filter(
@@ -188,7 +191,12 @@ export function TimelineToolbar({
         <TooltipProvider delayDuration={500}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={onSplit}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onSplit}
+                disabled={!isSelected || isLocked}
+              >
                 <Scissors className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
@@ -197,7 +205,12 @@ export function TimelineToolbar({
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={onDuplicate}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onDuplicate}
+                disabled={!isSelected || isLocked}
+              >
                 <Copy className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
@@ -206,7 +219,12 @@ export function TimelineToolbar({
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={onDelete}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onDelete}
+                disabled={!isSelected || isLocked}
+              >
                 <Trash2 className="h-4 w-4" />
               </Button>
             </TooltipTrigger>

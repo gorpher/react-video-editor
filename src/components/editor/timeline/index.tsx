@@ -11,6 +11,11 @@ import {
   ArrowUp,
   ArrowDown,
   Trash2,
+  Copy,
+  Clipboard,
+  CopyPlus,
+  LockKeyholeOpen,
+  LockKeyhole,
 } from "lucide-react";
 import { useTimelineStore } from "@/stores/timeline-store";
 import { usePlaybackStore } from "@/stores/playback-store";
@@ -41,6 +46,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuShortcut,
+  ContextMenuTrigger,
+  ContextMenuSeparator,
+} from "@/components/ui/context-menu";
 import { Button } from "@/components/ui/button";
 import { Audio as StudioAudio, Image as StudioImage, Log, Video as StudioVideo } from "openvideo";
 import { toast } from "sonner";
@@ -52,6 +65,7 @@ import {
   readTimelineAssetDragData,
   type TimelineAssetDragPayload,
 } from "@/lib/timeline-drag";
+import { useClipActions } from "../options-floating-menu";
 
 const TRACK_MENU_LABELS = {
   moveTrackUp: "\u4e0a\u79fb\u8f68\u9053",
@@ -73,6 +87,16 @@ export function Timeline() {
   const { studio } = useStudioStore();
   const { canvasSize } = useProjectStore();
   const { theme, resolvedTheme } = useTheme();
+  const {
+    selectedClip,
+    isLocked,
+    hasClipboard,
+    handleCopy,
+    handlePaste,
+    handleDuplicate,
+    handleToggleLock,
+    handleDelete,
+  } = useClipActions();
 
   const currentTheme = (theme === "system" ? resolvedTheme : theme) as "dark" | "light";
 
@@ -121,9 +145,18 @@ export function Timeline() {
   const tracksContentRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
   const timelineCanvasRef = useRef<TimelineCanvas | null>(null);
+  const [canvasInstance, setCanvasInstance] = useState<TimelineCanvas | null>(null);
   const isUpdatingRef = useRef(false);
   const [dragHoverTrackId, setDragHoverTrackId] = useState<string | null>(null);
   const [isTimelineDragActive, setIsTimelineDragActive] = useState(false);
+  const lastDragPos = useRef({ x: 0, y: 0 });
+  const dragRafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (dragRafRef.current) cancelAnimationFrame(dragRafRef.current);
+    };
+  }, []);
 
   const handleScrollChange = useCallback(
     (scrollX: number) => {
@@ -269,7 +302,7 @@ export function Timeline() {
       getDuration: () => useTimelineStore.getState().getTotalDuration(),
     });
     timelineCanvasRef.current = canvas;
-
+    setCanvasInstance(canvas);
     // Set up UI event listeners (scroll/zoom)
     canvas.on("scroll", ({ deltaX, deltaY, scrollX, scrollY }) => {
       if (isUpdatingRef.current) return;
@@ -355,14 +388,20 @@ export function Timeline() {
     }
   }, [currentTheme]);
 
-  const handleDelete = useCallback(() => {
-    studio?.deleteSelected();
-  }, [studio]);
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      if (!canvasInstance) return;
 
-  const handleDuplicate = useCallback(() => {
-    studio?.duplicateSelected();
-  }, [studio]);
+      // Find object under mouse
+      const target = canvasInstance.canvas.findTarget(e.nativeEvent);
 
+      if (target && (target as any).elementId) {
+        const clipId = (target as any).elementId;
+        canvasInstance.selectClips([clipId]);
+      }
+    },
+    [canvasInstance],
+  );
   const handleSplit = useCallback(() => {
     // Current time is in seconds in PlaybackStore. Canvas expects microseconds.
     const splitTime = usePlaybackStore.getState().currentTime * 1_000_000;
@@ -804,7 +843,7 @@ export function Timeline() {
         onSplit={handleSplit}
         onAddTrack={(trackType) => handleCreateTrack(trackType)}
       />
-      <TimelineStudioSync timelineCanvas={timelineCanvasRef.current} />
+      <TimelineStudioSync timelineCanvas={canvasInstance} />
 
       {/* Timeline Container */}
       <div className="flex-1 flex flex-col overflow-hidden relative bg-card" ref={timelineRef}>
@@ -982,7 +1021,6 @@ export function Timeline() {
             </div>
           )}
 
-          {/* Timeline Tracks Content */}
           <div
             ref={tracksContentRef}
             className={cn(
@@ -990,7 +1028,160 @@ export function Timeline() {
               isTimelineDragActive && "bg-primary/5",
             )}
           >
-            <div id="timeline-canvas" className="w-full h-full" />
+            <ContextMenu>
+              <ContextMenuTrigger asChild>
+                <div
+                  id="timeline-canvas"
+                  className="w-full h-full"
+                  onContextMenu={handleContextMenu}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (!timelineCanvasRef.current) return;
+
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+
+                    // Spatial debounce: only update if moved significantly
+                    const dx = Math.abs(x - lastDragPos.current.x);
+                    const dy = Math.abs(y - lastDragPos.current.y);
+                    if (dx < 2 && dy < 2) return;
+
+                    lastDragPos.current = { x, y };
+
+                    if (dragRafRef.current) return;
+                    dragRafRef.current = requestAnimationFrame(() => {
+                      dragRafRef.current = null;
+                      timelineCanvasRef.current?.findJunction(x, y, true);
+                    });
+                  }}
+                  onDragLeave={() => {
+                    if (timelineCanvasRef.current) {
+                      timelineCanvasRef.current.clearTransitionButton();
+                    }
+                  }}
+                  onDrop={async (e) => {
+                    const type = e.dataTransfer.getData("type");
+                    if (type !== "transition") return;
+
+                    const transitionKey = e.dataTransfer.getData("text/plain");
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+
+                    if (timelineCanvasRef.current && studio) {
+                      const existingTransition = timelineCanvasRef.current.findTransition(x, y);
+
+                      if (existingTransition) {
+                        const clipA = clips[existingTransition.clipAId];
+                        const clipB = clips[existingTransition.clipBId];
+                        const minDuration = Math.min(
+                          clipA?.duration ?? Infinity,
+                          clipB?.duration ?? Infinity,
+                        );
+                        let duration = minDuration === Infinity ? 2_000_000 : minDuration * 0.25;
+                        const fps = 30;
+                        let frameCount = Math.round((duration / 1_000_000) * fps);
+                        if (frameCount % 2 !== 0) frameCount += 1;
+                        duration = Math.round((frameCount / fps) * 1_000_000);
+
+                        await studio.addTransition(
+                          transitionKey,
+                          duration,
+                          existingTransition.clipAId,
+                          existingTransition.clipBId,
+                        );
+                      } else {
+                        const junction = timelineCanvasRef.current.getJunction(
+                          x,
+                          y,
+                          true, // Use expanded logic for drop as well
+                        );
+                        if (junction) {
+                          const minDuration = Math.min(
+                            junction.clipA.duration ?? Infinity,
+                            junction.clipB.duration ?? Infinity,
+                          );
+                          let duration = minDuration === Infinity ? 2_000_000 : minDuration * 0.25;
+                          const fps = 30;
+                          let frameCount = Math.round((duration / 1_000_000) * fps);
+                          if (frameCount % 2 !== 0) frameCount += 1;
+                          duration = Math.round((frameCount / fps) * 1_000_000);
+
+                          await studio.addTransition(
+                            transitionKey,
+                            duration,
+                            junction.clipA.id,
+                            junction.clipB.id,
+                          );
+                        }
+                      }
+                    }
+                  }}
+                />
+              </ContextMenuTrigger>
+              {selectedClip && selectedClip?.type !== "Transition" && (
+                <ContextMenuContent
+                  className="w-44"
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                >
+                  {!isLocked && (
+                    <>
+                      <ContextMenuItem onClick={handleCopy} disabled={!selectedClip}>
+                        <Copy className="mr-2 w-4 h-4" />
+                        Copy
+                        <ContextMenuShortcut>⌘ C</ContextMenuShortcut>
+                      </ContextMenuItem>
+
+                      <ContextMenuItem onClick={handlePaste} disabled={!hasClipboard}>
+                        <Clipboard className="mr-2 w-4 h-4" />
+                        Paste
+                        <ContextMenuShortcut>⌘ V</ContextMenuShortcut>
+                      </ContextMenuItem>
+
+                      <ContextMenuItem onClick={handleDuplicate} disabled={!selectedClip}>
+                        <CopyPlus className="mr-2 w-4 h-4" />
+                        Duplicate
+                        <ContextMenuShortcut>⌘ D</ContextMenuShortcut>
+                      </ContextMenuItem>
+                    </>
+                  )}
+
+                  {selectedClip ? (
+                    <ContextMenuItem onClick={handleToggleLock}>
+                      {isLocked ? (
+                        <LockKeyholeOpen className="mr-2 w-4 h-4" />
+                      ) : (
+                        <LockKeyhole className="mr-2 w-4 h-4" />
+                      )}
+                      {isLocked ? "Unlock Clip" : "Lock Clip"}
+                      <ContextMenuShortcut>⌘ L</ContextMenuShortcut>
+                    </ContextMenuItem>
+                  ) : (
+                    <ContextMenuItem disabled>
+                      <LockKeyhole className="mr-2 w-4 h-4" />
+                      Lock Clip
+                      <ContextMenuShortcut>⌘ L</ContextMenuShortcut>
+                    </ContextMenuItem>
+                  )}
+
+                  {!isLocked && (
+                    <>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem onClick={handleDelete} disabled={!selectedClip}>
+                        <Trash2 className="mr-2 w-4 h-4" />
+                        Delete
+                        <ContextMenuShortcut>⌫</ContextMenuShortcut>
+                      </ContextMenuItem>
+                    </>
+                  )}
+                </ContextMenuContent>
+              )}
+            </ContextMenu>
+            {/* <TimelineClipMenu timelineCanvas={canvasInstance} /> */}
           </div>
         </div>
       </div>

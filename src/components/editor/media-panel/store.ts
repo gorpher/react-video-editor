@@ -1,5 +1,5 @@
+import { Icons } from "@/components/shared/icons";
 import {
-  IconArrowsLeftRight,
   IconFolder,
   type IconProps,
   IconLetterT,
@@ -60,7 +60,7 @@ export const tabs = {
     label: "音效",
   },
   transitions: {
-    icon: IconArrowsLeftRight,
+    icon: Icons.transition,
     label: "转场",
   },
   // captions/effects/elements are intentionally hidden for now.

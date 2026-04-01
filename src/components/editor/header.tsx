@@ -37,6 +37,8 @@ import { useRouter, useParams } from "next/navigation";
 import { storageService } from "@/lib/storage/storage-service";
 import { Save } from "lucide-react";
 import { createAndDownloadProjectAssetBundle } from "@/lib/asset-bundle";
+import AutosizeInput from "../ui/autosize-input";
+import { authClient } from "@/lib/auth-client";
 
 export default function Header() {
   const { studio } = useStudioStore();
@@ -50,10 +52,36 @@ export default function Header() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.projectId as string;
+  const { data: session } = authClient.useSession();
+  const { projectName, setProjectName } = useProjectStore();
   const [isSaving, setIsSaving] = useState(false);
-  const [projectName, setProjectName] = useState("\u672a\u547d\u540d\u9879\u76ee");
-  const [nameDraft, setNameDraft] = useState("\u672a\u547d\u540d\u9879\u76ee");
-  const [isEditingName, setIsEditingName] = useState(false);
+  const [title, setTitle] = useState(projectName || "Untitled video");
+
+  // Sync title with store when project name changes externally (like on initial load)
+  useEffect(() => {
+    if (projectName && projectName !== title) {
+      setTitle(projectName);
+    }
+  }, [projectName]);
+
+  // Debounce title update to database
+  useEffect(() => {
+    if (!session || !projectId || title === projectName) return;
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        await storageService.updateProject(projectId, { name: title });
+        setProjectName(title);
+        console.log("Project name updated in DB:", title);
+      } catch (error) {
+        console.error("Failed to update project name:", error);
+        toast.error("Failed to save project name");
+      }
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [title, session, projectId, projectName, setProjectName]);
+
   const hasInitializedCanvasAutosaveRef = useRef(false);
   const getCanvasMode = (): "preset" | "custom" => {
     return DEFAULT_CANVAS_PRESETS.some(
@@ -202,7 +230,6 @@ export default function Header() {
 
         if (!cancelled) {
           setProjectName(loadedName);
-          setNameDraft(loadedName);
         }
       } catch (error) {
         console.error("Failed to load project name", error);
@@ -249,69 +276,8 @@ export default function Header() {
       }
     }
   };
-  const persistProjectName = async (rawName: string, showSuccessToast = true) => {
-    if (!projectId) return false;
-
-    const nextName = rawName.trim();
-    if (!nextName) {
-      toast.error("\u9879\u76ee\u540d\u79f0\u4e0d\u80fd\u4e3a\u7a7a");
-      setNameDraft(projectName);
-      return false;
-    }
-
-    if (nextName === projectName) {
-      setNameDraft(nextName);
-      return true;
-    }
-
-    try {
-      const existing = await storageService.loadProject({ id: projectId });
-      if (!existing) {
-        toast.error("\u672a\u627e\u5230\u9879\u76ee");
-        return false;
-      }
-
-      const latestData = studio?.exportToJSON() ?? existing.data;
-      await storageService.saveProject({
-        project: {
-          ...existing,
-          name: nextName,
-          canvasSize,
-          canvasMode: getCanvasMode(),
-          fps,
-          data: latestData,
-          updatedAt: new Date(),
-        },
-      });
-
-      setProjectName(nextName);
-      setNameDraft(nextName);
-      if (showSuccessToast) {
-        toast.success("\u5df2\u66f4\u65b0\u9879\u76ee\u540d\u79f0");
-      }
-      return true;
-    } catch (error) {
-      console.error("Failed to rename project", error);
-      toast.error("\u9879\u76ee\u91cd\u547d\u540d\u5931\u8d25");
-      return false;
-    }
-  };
-
-  const handleRenameProject = async () => {
-    const renamed = await persistProjectName(nameDraft);
-    if (renamed) {
-      setIsEditingName(false);
-    }
-  };
   const handleManualSave = async () => {
     if (!studio || !projectId) return;
-
-    if (isEditingName) {
-      const renamed = await persistProjectName(nameDraft, false);
-      if (!renamed) return;
-      setIsEditingName(false);
-    }
-
     await handleSave(true);
   };
   const handleDownloadProjectAssets = async () => {
@@ -343,13 +309,30 @@ export default function Header() {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
         handleSave(false); // Silent save
-      }, 2000); // 2 second debounce
+      }, 1000); // 1 second debounce
     };
+    const eventsToListen = [
+      "history:changed",
+      "clip:added",
+      "clip:removed",
+      "clip:updated",
+      "clip:moved",
+      "track:added",
+      "track:removed",
+      "clips:removed",
+      "clip:replaced",
+      "clip:propsChange",
+      "propsChange",
+    ];
 
-    studio.on("history:changed", onStudioChange);
+    eventsToListen.forEach((event) => {
+      studio.on(event, onStudioChange);
+    });
 
     return () => {
-      studio.off("history:changed", onStudioChange);
+      eventsToListen.forEach((event) => {
+        studio.off(event, onStudioChange);
+      });
       clearTimeout(timeoutId);
     };
   }, [studio, projectId, canvasSize.width, canvasSize.height, fps]);
@@ -473,6 +456,9 @@ export default function Header() {
 
     document.body.appendChild(input);
     input.click();
+  };
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTitle(e.target.value);
   };
 
   return (
@@ -634,39 +620,20 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Center Section */}
-      <div className="pointer-events-auto absolute left-1/2 top-1/2 w-[320px] max-w-[40vw] -translate-x-1/2 -translate-y-1/2">
-        {isEditingName ? (
-          <input
-            autoFocus
-            value={nameDraft}
-            onChange={(e) => setNameDraft(e.target.value)}
-            onBlur={() => void handleRenameProject()}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                void handleRenameProject();
-              } else if (e.key === "Escape") {
-                e.preventDefault();
-                setNameDraft(projectName);
-                setIsEditingName(false);
-              }
-            }}
-            className="h-8 w-full rounded-md border border-border bg-background px-2 text-center text-sm font-medium outline-none ring-0 focus-visible:border-primary"
+      {/* <div className="absolute text-sm font-medium left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+        Untitled video
+      </div> */}
+
+      <div className="flex h-13 items-center justify-center gap-2">
+        <div className=" pointer-events-auto flex h-10 items-center gap-2 rounded-md px-2.5">
+          <AutosizeInput
+            name="title"
+            value={title}
+            onChange={handleTitleChange}
+            width={200}
+            inputClassName="border-none outline-none px-1 text-sm font-medium"
           />
-        ) : (
-          <button
-            type="button"
-            onClick={() => {
-              setNameDraft(projectName);
-              setIsEditingName(true);
-            }}
-            className="w-full truncate rounded-md px-2 py-1 text-center text-sm font-medium hover:bg-muted/60"
-            title="点击重命名项目"
-          >
-            {projectName || "未命名项目"}
-          </button>
-        )}
+        </div>
       </div>
 
       {/* Right Section */}

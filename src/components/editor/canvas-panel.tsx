@@ -6,6 +6,16 @@ import { useProjectStore } from "@/stores/project-store";
 import { editorFont } from "./constants";
 import { CUSTOM_TRANSITIONS } from "./transition-custom";
 import { CUSTOM_EFFECTS } from "./effect-custom";
+import { SelectionFloatingMenu } from "./selection-floating-menu";
+import { useClipActions } from "./options-floating-menu";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuShortcut,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { Clipboard, Copy, CopyPlus, LockKeyhole, LockKeyholeOpen, Trash2 } from "lucide-react";
 
 const STUDIO_CONFIG = {
   fps: 30,
@@ -32,9 +42,19 @@ export function CanvasPanel({ onReady }: CanvasPanelProps) {
   const onReadyRef = useRef(onReady);
   const previousCanvasSizeRef = useRef<{ width: number; height: number } | null>(null);
   const isAutoFittingRef = useRef(false);
-  const { setStudio } = useStudioStore();
-  const { canvasSize } = useProjectStore();
+  const { setStudio, setSelectedClips } = useStudioStore();
+  const { canvasSize, initialStudioJSON } = useProjectStore();
   const { theme, resolvedTheme } = useTheme();
+  const {
+    selectedClip,
+    isLocked,
+    hasClipboard,
+    handleCopy,
+    handlePaste,
+    handleDuplicate,
+    handleToggleLock,
+    handleDelete,
+  } = useClipActions();
 
   const bgColor = useMemo(() => {
     const currentTheme = theme === "system" ? resolvedTheme : theme;
@@ -135,14 +155,6 @@ export function CanvasPanel({ onReady }: CanvasPanelProps) {
         ]);
 
         // If there's initial data from the project store, load it now
-        const projectStore = useProjectStore.getState();
-        const initialJSON = projectStore.initialStudioJSON;
-        if (initialJSON) {
-          // Clear it immediately to "consume" it and avoid double-loading (especially in Strict Mode)
-          projectStore.setInitialStudioJSON(null);
-          console.log("Loading initial studio JSON", initialJSON);
-          await studioRef.current.loadFromJSON(initialJSON);
-        }
 
         onReadyRef.current?.();
       } catch (error) {
@@ -196,24 +208,143 @@ export function CanvasPanel({ onReady }: CanvasPanelProps) {
     });
   }, []);
 
+  useEffect(() => {
+    const projectStore = useProjectStore.getState();
+    if (initialStudioJSON !== null) {
+      projectStore.setInitialStudioJSON(null);
+      console.log("Loading initial studio JSON", initialStudioJSON);
+      studioRef.current?.loadFromJSON(initialStudioJSON);
+    }
+  }, [initialStudioJSON]);
+
+  useEffect(() => {
+    if (!studioRef.current) return;
+
+    const studio = studioRef.current;
+
+    const handleSelection = (data: { selected: any[] }) => {
+      setSelectedClips(data.selected);
+    };
+
+    const handleClear = () => {
+      setSelectedClips([]);
+    };
+
+    studio.on("selection:created", handleSelection);
+    studio.on("selection:updated", handleSelection);
+    studio.on("selection:cleared", handleClear);
+
+    return () => {
+      studio.off("selection:created", handleSelection);
+      studio.off("selection:updated", handleSelection);
+      studio.off("selection:cleared", handleClear);
+    };
+  }, [setSelectedClips]);
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (!studioRef.current || !canvasRef.current) return;
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Convert to PIXI global coordinates
+    const topmostClip = studioRef.current.selection.getTopmostClipAtPoint({
+      x,
+      y,
+    });
+
+    if (topmostClip) {
+      studioRef.current.selection.selectClip(topmostClip);
+    } else {
+      studioRef.current.selection.deselectClip();
+    }
+  };
+
   return (
-    <div className="h-full w-full flex flex-col min-h-0 min-w-0 bg-card rounded-sm relative">
-      <div
-        style={{
-          flex: 1,
-          position: "relative", // Ensure relative positioning for absolute children if needed
-          overflow: "hidden", // Hide anything outside (though canvas masks it too)
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className="h-full w-full flex flex-col min-h-0 min-w-0 bg-card rounded-sm relative">
+          <div
+            onContextMenu={handleContextMenu}
+            style={{
+              flex: 1,
+              position: "relative", // Ensure relative positioning for absolute children if needed
+              overflow: "hidden", // Hide anything outside (though canvas masks it too)
+            }}
+          >
+            <canvas
+              ref={canvasRef}
+              style={{
+                display: "block",
+                width: "100%",
+                height: "100%",
+                outline: "none", // Avoid focus outline on canvas click
+              }}
+              tabIndex={0}
+            />
+            <SelectionFloatingMenu />
+          </div>
+        </div>
+      </ContextMenuTrigger>
+
+      <ContextMenuContent
+        className="w-44"
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
         }}
       >
-        <canvas
-          ref={canvasRef}
-          style={{
-            display: "block",
-            width: "100%",
-            height: "100%",
-          }}
-        />
-      </div>
-    </div>
+        {selectedClip && selectedClip?.type !== "Transition" ? (
+          <>
+            {!isLocked && (
+              <>
+                <ContextMenuItem onClick={handleCopy} disabled={!selectedClip}>
+                  <Copy className="mr-2 w-4 h-4" />
+                  Copy
+                  <ContextMenuShortcut>⌘ C</ContextMenuShortcut>
+                </ContextMenuItem>
+
+                <ContextMenuItem onClick={handlePaste} disabled={!hasClipboard}>
+                  <Clipboard className="mr-2 w-4 h-4" />
+                  Paste
+                  <ContextMenuShortcut>⌘ V</ContextMenuShortcut>
+                </ContextMenuItem>
+
+                <ContextMenuItem onClick={handleDuplicate} disabled={!selectedClip}>
+                  <CopyPlus className="mr-2 w-4 h-4" />
+                  Duplicate
+                  <ContextMenuShortcut>⌘ D</ContextMenuShortcut>
+                </ContextMenuItem>
+              </>
+            )}
+
+            <ContextMenuItem onClick={handleToggleLock}>
+              {isLocked ? (
+                <LockKeyholeOpen className="mr-2 w-4 h-4" />
+              ) : (
+                <LockKeyhole className="mr-2 w-4 h-4" />
+              )}
+              {isLocked ? "Unlock" : "Lock"}
+              <ContextMenuShortcut>⌘ L</ContextMenuShortcut>
+            </ContextMenuItem>
+
+            {!isLocked && (
+              <ContextMenuItem onClick={handleDelete} disabled={!selectedClip}>
+                <Trash2 className="mr-2 w-4 h-4" />
+                Delete
+                <ContextMenuShortcut>⌫</ContextMenuShortcut>
+              </ContextMenuItem>
+            )}
+          </>
+        ) : (
+          <ContextMenuItem onClick={handlePaste} disabled={!hasClipboard}>
+            <Clipboard className="mr-2 w-4 h-4" />
+            Paste
+            <ContextMenuShortcut>⌘ V</ContextMenuShortcut>
+          </ContextMenuItem>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
