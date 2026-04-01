@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useStudioStore } from "@/stores/studio-store";
 import { useProjectStore } from "@/stores/project-store";
 import { Image, Video, Audio, Log, clipToJSON, type IClip as StudioClip } from "openvideo";
-import { Upload, Search, X, HardDrive, Trash2, Music, Plus } from "lucide-react";
+import { Upload, Search, Trash2, Music, Plus } from "lucide-react";
 import { storageService, type StorageStats } from "@/lib/storage/storage-service";
 import type { MediaFile, MediaType } from "@/types/media";
 import type { AifilmMediaItem } from "@/lib/aifilm-media";

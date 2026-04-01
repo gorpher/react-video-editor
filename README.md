@@ -3,140 +3,222 @@
     <img width="150px" height="150px" src="https://cdn.scenify.io/openvideo-logo.png"/>
   </a>
 </p>
-<h1 align="center">OpenVideo Editor</h1>
+<h1 align="center">OpenVideo Editor — 增强版</h1>
 
 <div align="center">
-  
-  
-An advanced, AI-powered video editor that leverages **WebCodecs API** for high-performance client-side video rendering. This project allows users to create, edit, and export videos directly in the browser with the power of AI.
 
-<p align="center">
-    <a href="https://openvideo.dev/">OpenVideo</a>
-    ·  
-    <a href="https://discord.gg/SCfMrQx8kr">Discord</a>
-    ·  
-    <a href="https://docs.openvideo.dev">Docs</a>
-</p>
+基于 [openvideodev/react-video-editor](https://github.com/openvideodev/react-video-editor) 的衍生版本，增加了中文界面、AIFilm 素材库集成、离线 Docker 部署等功能。
+
 </div>
 
-[![](https://cdn.scenify.io/openvideo-editor.png)](https://github.com/openvideodev/openvideo)
+> **Fork 声明**：本项目 fork 自 [openvideodev/react-video-editor](https://github.com/openvideodev/react-video-editor)，版权归 OpenVideoDev 所有，遵循 [AGPL-3.0](LICENSE) 协议。本版本的修改部分版权归本项目贡献者所有，同样遵循 AGPL-3.0。
 
-### 🤖 AI-Powered Capabilities
+---
 
-- **AI Copilot**: Chat-based editing assistant to generate scripts, change visuals, and control the timeline.
-- **Script Generation**: Integrated with **OpenAI** and **Gemini** to create engaging video scripts from simple prompts.
-- **Text-to-Speech**: High-quality voice synthesization using **ElevenLabs** for professional voiceovers.
-- **Auto-Captions**: Automatic transcription and caption generation using **Deepgram**.
+## 与原版的主要差异
 
-### 🎬 Professional Video Editing
+| 功能 | 说明 |
+|------|------|
+| 中文 UI | 媒体面板、工具栏、操作提示汉化 |
+| AIFilm 素材库 | 通过同源代理接入 AIFilm 媒体库，与本地上传合并展示 |
+| 视频插入优化 | 插入时自动顺延后续片段（ripple insert） |
+| 转场修复 | 支持选中 1 段或 2 段两种方式；增加容差；跨轨保护 |
+| 音乐轨道修复 | 修复上传按钮无响应、音频导出失败问题 |
+| 关闭/恢复原声 | 轨道工具栏批量静音/取消静音视频轨道 |
+| WebCodecs 检测 | 区分 secure context 缺失与 API 缺失，阻止无效渲染 |
+| 本地优先存储 | 未登录时自动降级至 IndexedDB，无缝使用 |
+| 素材打包下载 | 一键将所有素材（本地 + 远端）打包为 ZIP 下载 |
+| 离线 Docker 部署 | 支持内网隔离环境完整部署 |
 
-- **Multi-Track Timeline**: Advanced timeline for managing video, audio, image, and text tracks.
-- **Client-Side Rendering**: Fast, private, and server-free rendering using the **WebCodecs API**.
-- **Rich Media Editing**: Trim, split, resize, rotate, and position elements with precision.
-- **Transitions & Effects**: Built-in library of transitions and visual effects to enhance your videos.
+---
 
-### 🎨 Assets & Media
+## 核心功能（继承自原版）
 
-- **Stock Library Integration**: Direct access to royalty-free images and videos from **Pexels** and **Freepik**.
-- **Media Uploads**: Easy drag-and-drop upload for your own videos, images, and audio files.
-- **Cloud Storage**: Secure asset management compatible with S3/R2.
+### AI 能力
 
-### 🚀 Export & Integration
+- **AI 助手**：对话式编辑，通过自然语言控制时间轴
+- **文字转语音**：ElevenLabs 高质量配音
+- **自动字幕**：Deepgram 语音转文字
 
-- **Social Media Ready**: Optimized export presets for TikTok, Instagram Reels, and YouTube Shorts.
-- **High-Quality Export**: Export videos in MP4 format up to 4K resolution.
+### 视频编辑
 
-## Getting Started
+- **多轨时间轴**：视频、音频、图片、文字多轨管理
+- **客户端渲染**：基于 WebCodecs API，无需上传到服务器
+- **丰富编辑操作**：裁剪、分割、缩放、旋转、位置调整
+- **转场与特效**：内置转场库与视觉特效
 
-### Prerequisites
+### 素材与导出
 
-- **Node.js** (v18 or higher recommended)
-- **pnpm** (Package Manager)
+- **素材库**：Pexels 免版权图片/视频
+- **本地上传**：拖拽上传视频、图片、音频
+- **云存储**：S3/R2 兼容对象存储
+- **高质量导出**：MP4 格式，最高 4K
 
-### Installation
+---
 
-1.  Clone the repository:
+## 快速开始
 
-    ```bash
-    git clone https://github.com/openvideodev/react-video-editor.git
-    cd react-video-editor
-    ```
+### 环境要求
 
-2.  Install dependencies:
+- **Node.js** v18+
+- **pnpm**
 
-    ```bash
-    pnpm install
-    ```
+### 安装
 
-3.  Configure environment variables:
-    Copy the sample environment file to `.env`:
+```bash
+git clone <本仓库地址>
+cd react-video-editor
+pnpm install
+```
 
-    ```bash
-    cp .env.sample .env
-    ```
+### 配置环境变量
 
-    > **Note**: You will need to obtain API keys for services like OpenAI, ElevenLabs, and others to fully utilize the AI features.
+```bash
+cp .env.sample .env.local
+```
 
-    ### AIFilm media library integration
+**最小启动**（无需数据库，使用本地 IndexedDB 存储）：
 
-    If you want the **Uploads** panel to load assets from AIFilm, add these variables to `.env`:
+无需填写任何变量，直接启动即可在本地模式下使用。
 
-    ```env
-    AIFILM_API_BASE_URL="http://localhost:3000"
-    AIFILM_DEV_ACTOR="dev-actor"
-    AIFILM_DEV_USER_ID="dev-user"
-    ```
+**完整配置**参考 `.env.sample` 和下方[环境变量说明](#环境变量说明)。
 
-    - `AIFILM_API_BASE_URL`: Required. Points to the AIFilm backend base URL.
-    - `AIFILM_DEV_ACTOR`: Optional. Useful in development when the AIFilm backend accepts the `x-dev-actor` fallback.
-    - `AIFILM_DEV_USER_ID`: Optional. Useful in development when you do not already have a valid AIFilm session cookie and the backend allows the `x-dev-user-id` fallback.
-    - The editor uses a same-origin Next API proxy for AIFilm media, so the AIFilm address should stay in environment variables instead of being hardcoded in the client.
-    - If you already have a valid AIFilm login session available to the proxy, you can leave `AIFILM_DEV_ACTOR` and `AIFILM_DEV_USER_ID` empty.
+### 数据库初始化（账号功能）
 
-4.  Run the development server:
+```bash
+pnpm prisma migrate dev
+```
 
-    ```bash
-    pnpm dev
-    ```
+### 启动开发服务器
 
-5.  Open [http://localhost:5000](http://localhost:5000) with your browser to see the result.
+```bash
+pnpm dev
+# 访问 http://localhost:5000
+```
 
-## Offline Delivery (Independent Package)
+> **注意**：编辑器依赖 WebCodecs，需要在 HTTPS 或 `localhost` 下运行。局域网 `http://IP` 访问会导致编辑器不可用。
 
-This repository can be packaged and deployed offline as an independent bundle (`web + postgres`).
-AIFilm should stay as a separate service and communicate through HTTP (`AIFILM_API_BASE_URL`).
-Postgres is internal-only in compose and is not mapped to a host port.
+---
 
-1. Build and pack on delivery machine:
+## Docker 部署
 
-   ```powershell
-   npm run offline:pack
-   ```
+复制并填写 Docker 配置：
 
-2. Deploy on target machine:
+```bash
+cp .env.docker.example .env.docker
+# 编辑 .env.docker，至少填写 BETTER_AUTH_SECRET
+```
 
-   ```powershell
-   npm run offline:deploy
-   ```
+启动：
 
-3. Verify deployment:
+```bash
+docker compose -f docker-compose.offline.yml --env-file .env.docker up -d
+```
 
-   ```powershell
-   npm run offline:verify
-   ```
+### 离线部署（内网环境）
 
-Bundle output defaults to: `offline-bundle\yyyyMMdd_HHmmss`.
-Remember to set `AIFILM_API_BASE_URL` in `.env` to the independent AIFilm HTTP address.
+```powershell
+# 1. 在联网机器上打包
+pnpm offline:pack
+
+# 2. 将 offline-bundle/ 目录拷贝到目标机器
+# 3. 在目标机器上部署
+pnpm offline:deploy
+
+# 4. 验证
+pnpm offline:verify
+```
+
+---
+
+## 环境变量说明
+
+### 核心（账号与数据库）
+
+| 变量 | 说明 | 必填 |
+|------|------|------|
+| `DATABASE_URL` | PostgreSQL 连接字符串 | 账号功能必填 |
+| `DIRECT_URL` | PostgreSQL 直连字符串（Prisma 用） | 同上 |
+| `BETTER_AUTH_URL` | 应用访问地址，如 `http://localhost:5000` | 同上 |
+| `BETTER_AUTH_SECRET` | 随机长字符串，用于签名 session | 同上 |
+
+### AI 功能
+
+| 变量 | 说明 |
+|------|------|
+| `GOOGLE_GENAI_API_KEY` | Gemini AI 助手 |
+| `DEEPGRAM_API_KEY` | 字幕/语音转文字 |
+| `DEEPGRAM_URL` | Deepgram 接口地址（默认 `https://api.deepgram.com/v1`） |
+| `ELEVENLABS_API_KEY` | AI 配音 |
+| `ELEVENLABS_URL` | ElevenLabs 接口地址（默认 `https://api.elevenlabs.io`） |
+
+### 素材库
+
+| 变量 | 说明 |
+|------|------|
+| `PEXELS_API_KEY` | Pexels 图片/视频素材 |
+| `AIFILM_API_BASE_URL` | AIFilm 素材库后端地址（可选） |
+| `AIFILM_DEV_USER_ID` | 开发调试用，AIFilm 模拟用户 ID |
+
+### 对象存储
+
+| 变量 | 说明 |
+|------|------|
+| `R2_BUCKET_NAME` | Cloudflare R2 存储桶名称 |
+| `R2_ACCESS_KEY_ID` | R2 Access Key |
+| `R2_SECRET_ACCESS_KEY` | R2 Secret Key |
+| `R2_ACCOUNT_ID` | Cloudflare 账号 ID |
+| `R2_PUBLIC_DOMAIN` | R2 公共访问域名 |
+
+### OAuth 认证（可选）
+
+| 变量 | 说明 |
+|------|------|
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google 登录 |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub 登录 |
+| `RESEND_API_KEY` | 邮件发送（邮箱验证码） |
+
+### 其他
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `BATCH_EXPORT_DIR` | 批量导出文件写入目录 | `./exports` |
+
+---
+
+## AIFilm 素材库集成
+
+本项目通过 Next.js 同源代理访问 AIFilm，**不在前端直接跨域请求**：
+
+```
+Browser → /api/aifilm/* → AIFilm 后端
+```
+
+这样可以保证 cookie 鉴权、Range 请求和 Docker 交付的一致性。配置 `AIFILM_API_BASE_URL` 即可启用。
+
+---
+
+## 与原项目保持同步
+
+```bash
+git remote add upstream https://github.com/openvideodev/react-video-editor
+git fetch upstream
+git merge upstream/main
+```
+
+---
 
 ## License
 
-**OpenVideo** is dual-licensed:
+本项目遵循 **[GNU AGPL-3.0](LICENSE)** 协议开源。
 
-1.  **Personal Use**: Free for personal, non-commercial use. You are welcome to explore the code, modify it, and use it for your own personal projects.
-2.  **Commercial Use**: Any commercial usage of this software requires a valid commercial license from **OpenVideo**.
+- 原项目版权：Copyright (c) 2026 OpenVideoDev
+- 本版本修改部分：Copyright (c) 2026 本项目贡献者
 
-For commercial licensing inquiries, please contact **OpenVideo**.
+商业授权（绕过 AGPL 要求）请联系原项目：hello@openvideo.dev
+
+---
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+欢迎提交 Pull Request 和 Issue！

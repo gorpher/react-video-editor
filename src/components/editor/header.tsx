@@ -36,6 +36,7 @@ import { ModeToggle } from "../ui/mode-toggle";
 import { useRouter, useParams } from "next/navigation";
 import { storageService } from "@/lib/storage/storage-service";
 import { Save } from "lucide-react";
+import { createAndDownloadProjectAssetBundle } from "@/lib/asset-bundle";
 
 export default function Header() {
   const { studio } = useStudioStore();
@@ -43,6 +44,7 @@ export default function Header() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isBatchExporting, setIsBatchExporting] = useState(false);
+  const [isBundlingAssets, setIsBundlingAssets] = useState(false);
   const [customWidth, setCustomWidth] = useState("");
   const [customHeight, setCustomHeight] = useState("");
   const router = useRouter();
@@ -158,7 +160,7 @@ export default function Header() {
         if (!uploadRes.ok) throw new Error(`Failed to save ${key}`);
       }
 
-      toast.success(`Batch export complete! ${keys.length} videos saved to D:\\animations`, {
+      toast.success(`批量导出完成！${keys.length} 个视频已保存`, {
         id: toastId,
       });
     } catch (error: any) {
@@ -311,6 +313,25 @@ export default function Header() {
     }
 
     await handleSave(true);
+  };
+  const handleDownloadProjectAssets = async () => {
+    if (!projectId || isBundlingAssets) return;
+
+    setIsBundlingAssets(true);
+    const toastId = toast.loading("\u6b63\u5728\u6253\u5305\u9879\u76ee\u7d20\u6750...");
+
+    try {
+      const result = await createAndDownloadProjectAssetBundle({ projectId });
+      toast.success(
+        `\u9879\u76ee\u7d20\u6750\u5305\u5df2\u4e0b\u8f7d\uff1a${result.successCount}/${result.totalAssets}`,
+        { id: toastId },
+      );
+    } catch (error) {
+      console.error("Failed to download project asset bundle", error);
+      toast.error("\u9879\u76ee\u7d20\u6750\u5305\u4e0b\u8f7d\u5931\u8d25", { id: toastId });
+    } finally {
+      setIsBundlingAssets(false);
+    }
   };
   // Auto-save on studio changes (with debounce)
   useEffect(() => {
@@ -680,6 +701,19 @@ export default function Header() {
         <ShortcutsModal open={isShortcutsModalOpen} onOpenChange={setIsShortcutsModalOpen} />
 
         <ModeToggle />
+
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-2"
+          onClick={() => void handleDownloadProjectAssets()}
+          disabled={!projectId || isBundlingAssets}
+        >
+          <Download className="size-4" />
+          {isBundlingAssets
+            ? "\u6253\u5305\u4e2d"
+            : "\u4e0b\u8f7d\u9879\u76ee\u7d20\u6750\u5305"}
+        </Button>
 
         <Button
           size="sm"

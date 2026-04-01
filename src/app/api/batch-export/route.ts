@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const exportDir = "D:\\animations";
+    const exportDir = process.env.BATCH_EXPORT_DIR || path.join(process.cwd(), "exports");
     if (!fs.existsSync(exportDir)) {
       fs.mkdirSync(exportDir, { recursive: true });
     }
