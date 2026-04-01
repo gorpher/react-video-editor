@@ -8,6 +8,7 @@
 <div align="center">
 
 基于 [openvideodev/react-video-editor](https://github.com/openvideodev/react-video-editor) 的衍生版本，增加了中文界面、AIFilm 素材库集成、离线 Docker 部署等功能。
+<h2>官方原版中存在的大量问题影响正常使用的bug已经修复,界面已经汉化，可以直接进入编排工作</h2>
 
 </div>
 
